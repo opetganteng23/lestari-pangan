@@ -41,11 +41,12 @@ S.pelaku = async (m) => {
 };
 S.kelompok = async (m) => {
   const [gs, pe] = await Promise.all([api('/api/groups'), api('/api/actors?role=pengepul')]); const nm = Object.fromEntries(pe.map((p) => [p._id, p.name]));
-  m.innerHTML = `<div class="card"><div class="row" style="align-items:center"><h2 style="margin:0">Kelompok tani (master data, tanpa akun)</h2><div class="btns" style="flex:none"><button class="btn pri sm" id="ng">Tambah kelompok</button></div></div><p class="small" style="margin:6px 0 10px">Kode ketua bersifat statis, disimpan sebagai hash, dan bisa dirotasi. Pengepul hanya bisa mencatat setoran dari kelompok yang terhubung.</p><div class="tw"><table><tr><th>Kelompok</th><th>Lokasi</th><th>Ketua</th><th>Luas</th><th>Rata-rata setoran</th><th>Pengepul terhubung</th><th>Status</th><th></th></tr>${gs.map((g) => `<tr><td><b>${esc(g.name)}</b></td><td>${esc(g.district)}</td><td>${esc(g.ketua)}</td><td>${g.hectares} ha</td><td>${kg(g.avgWeightKg)}</td><td>${(g.linkedActorIds || []).map((i) => esc(nm[i] || i)).join(', ') || '-'}</td><td>${g.active ? chip('verified', 'Aktif') : chip('voided', 'Nonaktif')}</td><td><div class="btns"><button class="btn sm" data-r="${g._id}">Rotasi kode</button><button class="btn sm" data-l="${g._id}">Hubungkan</button><button class="btn sm" data-a="${g._id}" data-v="${g.active}">${g.active ? 'Nonaktifkan' : 'Aktifkan'}</button></div></td></tr>`).join('')}</table></div></div>`;
+  m.innerHTML = `<div class="card"><div class="row" style="align-items:center"><h2 style="margin:0">Kelompok tani (master data, tanpa akun)</h2><div class="btns" style="flex:none"><button class="btn pri sm" id="ng">Tambah kelompok</button></div></div><p class="small" style="margin:6px 0 10px">Kode ketua bersifat statis, disimpan sebagai hash, dan bisa dirotasi. Pengepul hanya bisa mencatat setoran dari kelompok yang terhubung.</p><div class="tw"><table><tr><th>Kelompok</th><th>Lokasi</th><th>Ketua</th><th>Luas</th><th>Rata-rata setoran</th><th>Pengepul terhubung</th><th>Status</th><th></th></tr>${gs.map((g) => `<tr><td><b>${esc(g.name)}</b></td><td>${esc(g.district)}</td><td>${esc(g.ketua)}</td><td>${g.hectares} ha</td><td>${kg(g.avgWeightKg)}</td><td>${(g.linkedActorIds || []).map((i) => esc(nm[i] || i)).join(', ') || '-'}</td><td>${g.active ? chip('verified', 'Aktif') : chip('voided', 'Nonaktif')}</td><td><div class="btns"><button class="btn sm" data-r="${g._id}">Rotasi kode</button><button class="btn sm" data-l="${g._id}">Hubungkan</button><button class="btn sm" data-a="${g._id}" data-v="${g.active}">${g.active ? 'Nonaktifkan' : 'Aktifkan'}</button><button class="btn sm dan" data-x="${g._id}">Hapus</button></div></td></tr>`).join('')}</table></div></div>`;
   const showCode = (g, code) => openModal({ title: 'Kode ketua', hideSubmit: true, cancel: 'Tutup', body: `<p>Kode untuk <b>${esc(g)}</b> (hanya ditampilkan sekali):</p><p class="mono" style="font-size:26px;margin:14px 0;color:var(--g800)">${esc(code)}</p><p class="small">Sampaikan langsung kepada ketua kelompok. Sistem hanya menyimpan hash-nya.</p>` });
   $('#ng').onclick = () => openModal({ title: 'Tambah kelompok tani', body: `${fld('name', 'Nama kelompok', { ph: 'KT Contoh Makmur' })}${fld('ketua', 'Nama ketua')}<div class="row"><div>${fld('village', 'Desa')}</div><div>${fld('district', 'Kecamatan, kabupaten', { ph: 'Pagaden, Subang' })}</div></div><div class="row"><div>${fld('lat', 'Lintang', { type: 'number', step: 'any', value: -6.5 })}</div><div>${fld('lng', 'Bujur', { type: 'number', step: 'any', value: 107.8 })}</div></div><div class="row"><div>${fld('hectares', 'Luas (ha)', { type: 'number', value: 10 })}</div><div>${fld('avgWeightKg', 'Rata-rata setoran (kg)', { type: 'number', value: 1500 })}</div></div>${fld('link', 'Hubungkan ke pengepul', { type: 'select', required: false, options: opts(pe, '_id', 'name', '(nanti)') })}`, onSubmit: async (fd, c) => { const r = await api('/api/groups', { method: 'POST', body: { ...fd, linkedActorIds: fd.link ? [fd.link] : [] } }); c(); showCode(r.group.name, r.code); reload(); } });
   m.querySelectorAll('[data-r]').forEach((b) => (b.onclick = guard(async () => { if (!confirm('Rotasi kode? Kode lama tidak berlaku lagi.')) return; const g = gs.find((x) => x._id === b.dataset.r); const r = await api(`/api/groups/${g._id}/rotate`, { method: 'POST' }); showCode(g.name, r.code); })));
   m.querySelectorAll('[data-a]').forEach((b) => (b.onclick = guard(async () => { await api('/api/groups/' + b.dataset.a, { method: 'PUT', body: { active: b.dataset.v !== 'true' } }); reload(); })));
+  m.querySelectorAll('[data-x]').forEach((b) => (b.onclick = guard(async () => { if (confirm('Hapus kelompok tani ini?')) { await api('/api/groups/' + b.dataset.x, { method: 'DELETE' }); reload(); } })));
   m.querySelectorAll('[data-l]').forEach((b) => (b.onclick = () => { const g = gs.find((x) => x._id === b.dataset.l); openModal({ title: 'Hubungkan pengepul · ' + g.name, body: pe.map((p) => `<label style="display:flex;gap:8px;margin:8px 0"><input type="checkbox" name="${p._id}" ${(g.linkedActorIds || []).includes(p._id) ? 'checked' : ''}> ${esc(p.name)}</label>`).join(''), onSubmit: async (fd, c) => { await api('/api/groups/' + g._id, { method: 'PUT', body: { linkedActorIds: Object.keys(fd) } }); c(); toast('Tautan diperbarui'); reload(); } }); }));
 };
 S.sengketa = async (m) => { const ts = (await api('/api/transfers?box=disputed')).filter((t) => t.status === 'disputed');
@@ -94,4 +95,43 @@ S['mode-lihat'] = async (m) => {
   m.innerHTML = `<div class="card" style="max-width:560px"><h2>Mode Lihat</h2><p class="small">Melihat aplikasi persis seperti pelaku tertentu, tanpa bisa mengubah apa pun. Setiap pergantian tercatat di audit log.</p><form id="vf">${fld('role', 'Peran', { type: 'select', options: roles.map((r) => `<option value="${r}">${ROLE[r]}</option>`).join('') })}${fld('actorId', 'Pelaku', { type: 'select', options: '' })}<div class="btns" style="margin-top:14px"><button class="btn pri">Lihat sebagai pelaku ini</button></div></form></div>`;
   const fill = () => { $('[name=actorId]').innerHTML = opts(actors.filter((a) => a.role === $('[name=role]').value), '_id', (a) => `${a.name} (${a.district || '-'})`); }; $('[name=role]').onchange = fill; fill();
   $('#vf').onsubmit = guard(async (e) => { e.preventDefault(); const fd = Object.fromEntries(new FormData(e.target)); await api('/api/sa/view', { method: 'POST', body: { actorId: fd.actorId } }); ss.set('lp_act', null); ss.set('lp_view', { actorId: fd.actorId }); location.hash = '#/'; location.reload(); });
+};
+
+// ---------- Pengguna (CRUD, admin) ----------
+const USER_ROLE_LIST = ['pengepul', 'gudang', 'distributor', 'logistik', 'retailer', 'pengawas', 'admin'];
+const roleOpts = (list, sel) => list.map((r) => `<option value="${r}" ${sel === r ? 'selected' : ''}>${ROLE[r]}</option>`).join('');
+
+S.pengguna = async (m) => {
+  const us = await api('/api/users'); const f = ss.get('lp_uf') || { q: '', role: '' };
+  const rows = us.filter((u) => (!f.role || u.role === f.role) && (!f.q || (u.name + u.email).toLowerCase().includes(f.q.toLowerCase())));
+  const tbl = rows.length
+    ? `<div class="tw"><table><tr><th>Nama</th><th>Email</th><th>Peran</th><th>Wilayah</th><th>Status</th><th></th></tr>${rows.map((u) => `<tr><td><b>${esc(u.name)}</b></td><td>${esc(u.email)}</td><td>${ROLE[u.role]}</td><td>${esc(u.district || '-')}</td><td>${u.active ? chip('verified', 'Aktif') : chip('voided', 'Nonaktif')}</td><td><div class="btns"><button class="btn sm" data-e="${u._id}">Ubah</button><button class="btn sm" data-p="${u._id}">Reset sandi</button><button class="btn sm" data-t="${u._id}" data-a="${u.active}">${u.active ? 'Nonaktifkan' : 'Aktifkan'}</button><button class="btn sm dan" data-d="${u._id}">Hapus</button></div></td></tr>`).join('')}</table></div>`
+    : '<div class="empty">Tidak ada pengguna yang cocok</div>';
+  m.innerHTML = `<div class="card"><div class="row" style="align-items:center"><h2 style="margin:0">Manajemen pengguna <span class="small">(${us.length} akun)</span></h2><div class="btns" style="flex:none"><button class="btn pri sm" id="nu">Tambah pengguna</button></div></div>
+  <div class="row" style="margin:12px 0"><input class="inp" id="uq" placeholder="Cari nama atau email" value="${esc(f.q)}"><select class="inp" id="ur"><option value="">Semua peran</option>${roleOpts(USER_ROLE_LIST, f.role)}</select></div>${tbl}</div>`;
+  const keep = () => { ss.set('lp_uf', { q: $('#uq').value, role: $('#ur').value }); reload(); };
+  $('#ur').onchange = keep; $('#uq').onchange = keep;
+  $('#nu').onclick = () => openModal({
+    title: 'Tambah pengguna',
+    body: `${fld('role', 'Peran', { type: 'select', options: roleOpts(USER_ROLE_LIST) })}${fld('name', 'Nama / nama usaha')}${fld('email', 'Email', { type: 'email' })}${fld('district', 'Wilayah (untuk pelaku rantai pasok)', { required: false })}${fld('password', 'Kata sandi awal (min. 8 karakter)', { type: 'password' })}`,
+    onSubmit: async (fd, c) => { await api('/api/users', { method: 'POST', body: fd }); c(); toast('Pengguna dibuat'); reload(); },
+  });
+  const byId = (id) => us.find((x) => x._id === id);
+  m.querySelectorAll('[data-e]').forEach((b) => (b.onclick = () => {
+    const u = byId(b.dataset.e);
+    openModal({
+      title: 'Ubah ' + u.name,
+      body: `${fld('name', 'Nama', { value: u.name })}${fld('email', 'Email', { type: 'email', value: u.email })}${u.actorId ? fld('district', 'Wilayah', { required: false, value: u.district }) : fld('role', 'Peran', { type: 'select', options: roleOpts(['admin', 'pengawas'], u.role) })}`,
+      onSubmit: async (fd, c) => { await api('/api/users/' + u._id, { method: 'PUT', body: fd }); c(); toast('Tersimpan'); reload(); },
+    });
+  }));
+  m.querySelectorAll('[data-p]').forEach((b) => (b.onclick = () => {
+    const u = byId(b.dataset.p);
+    openModal({ title: 'Reset kata sandi · ' + u.name, submit: 'Reset', body: fld('password', 'Kata sandi baru (min. 8 karakter)', { type: 'password' }), onSubmit: async (fd, c) => { await api('/api/users/' + u._id, { method: 'PUT', body: fd }); c(); toast('Kata sandi diganti'); } });
+  }));
+  m.querySelectorAll('[data-t]').forEach((b) => (b.onclick = guard(async () => { await api('/api/users/' + b.dataset.t, { method: 'PUT', body: { active: b.dataset.a !== 'true' } }); reload(); })));
+  m.querySelectorAll('[data-d]').forEach((b) => (b.onclick = guard(async () => {
+    const u = byId(b.dataset.d);
+    if (confirm(`Hapus ${u.name}? Tidak bisa dibatalkan.`)) { await api('/api/users/' + u._id, { method: 'DELETE' }); toast('Pengguna dihapus'); reload(); }
+  })));
 };

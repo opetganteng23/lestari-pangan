@@ -25,14 +25,58 @@ async function sendModal(b) {
 const batchRows = (bs, actions) => bs.length ? `<div class="tw"><table><tr><th></th><th>Batch</th><th>Jenis</th><th>Komoditas</th><th>Berat</th><th>Status</th><th>QR</th><th></th></tr>${bs.map((b) => `<tr><td>${actions?.select && b.status === 'available' && ['deposit', 'merged'].includes(b.kind) ? `<input type="checkbox" class="sel" value="${b._id}">` : ''}</td><td class="mono"><a href="#/detail/${b._id}">${esc(b.code)}</a>${b.tainted ? ' <span class="chip bad">taint</span>' : ''}</td><td>${KIND[b.kind]}</td><td>${esc(b.commodity)}</td><td>${kg(b.weightKg)}</td><td>${chip(b.status)}</td><td class="mono">${esc(b.qrCode || b.meta?.lot || '-')}</td><td><div class="btns">${actions?.row ? actions.row(b) : ''}</div></td></tr>`).join('')}</table></div>` : '<div class="empty">Belum ada batch</div>';
 const trfRows = (ts, o = {}) => ts.length ? `<div class="tw"><table><tr><th>Kode</th><th>Batch</th><th>Dari</th><th>Ke</th><th>Dikirim</th><th>Diterima</th><th>Selisih</th><th>Status</th><th></th></tr>${ts.map((t) => `<tr><td class="mono">${t.code}</td><td class="mono"><a href="#/detail/${t.batchId}">${esc(t.batchCode)}</a></td><td>${esc(t.from)}</td><td>${esc(t.to)}${t.carrier ? `<br><span class="small">via ${esc(t.carrier)}</span>` : ''}</td><td>${kg(t.sentKg)}<br><span class="small">${dt(t.sentAt)}</span></td><td>${t.receivedKg ? kg(t.receivedKg) : '-'}</td><td>${t.variancePct != null ? t.variancePct + '%' : '-'}</td><td>${chip(t.status)}${t.viaException ? '<br><span class="chip gray">kirim langsung</span>' : ''}</td><td>${o.row ? o.row(t) : ''}</td></tr>`).join('')}</table></div>` : '<div class="empty">Belum ada transfer</div>';
 
-// ---------- Beranda (dispatch per peran) ----------
+// ---------- Beranda (dashboard per peran pelaku) ----------
+const sum = (a) => a.reduce((s, b) => s + (+b.weightKg || 0), 0);
+const rowItem = (t) => `<div style="padding:8px 0;border-bottom:1px solid #EEF2EF">${t}</div>`;
+
 S.beranda = async (m) => {
   if (me.role === 'admin') return S['admin-beranda'](m);
-  const [bs, ins, outs] = await Promise.all([api('/api/batches'), api('/api/transfers?box=in'), api('/api/transfers?box=out')]);
+  const isCar = me.role === 'logistik';
+  const [bs, ins, outs, car] = await Promise.all([
+    isCar ? [] : api('/api/batches'), isCar ? [] : api('/api/transfers?box=in'),
+    isCar ? [] : api('/api/transfers?box=out'), isCar ? api('/api/transfers?box=carrier') : [],
+  ]);
   const avail = bs.filter((b) => b.status === 'available'), pend = bs.filter((b) => b.status === 'pending_verification');
-  let extra = ''; if (me.role === 'pengepul') { const l = await api('/api/labels'); extra = `<div class="kpi"><span>Sisa label QR</span><b>${l.labels.filter((x) => x.status === 'unassigned').length}</b><em class="muted">kuota ${l.used}/${l.quota} bulan ini</em></div>`; }
-  m.innerHTML = `<div class="grid g5" style="margin-bottom:16px"><div class="kpi"><span>Batch tersedia</span><b>${avail.length}</b><em class="muted">${kg(avail.reduce((s, b) => s + b.weightKg, 0))}</em></div><div class="kpi"><span>Menunggu verifikasi</span><b>${pend.length}</b><em style="color:var(--amber)">tidak bisa digabung atau dikirim</em></div><div class="kpi"><span>Kiriman masuk</span><b>${ins.filter((t) => t.status === 'in_transit').length}</b><em class="muted">menunggu konfirmasi Anda</em></div><div class="kpi"><span>Kiriman keluar</span><b>${outs.filter((t) => t.status === 'in_transit').length}</b><em class="muted">${outs.filter((t) => t.status === 'disputed').length} sengketa</em></div>${extra}</div>
-  <div class="card"><h2>Batch terbaru</h2>${batchRows(bs.slice(0, 8))}</div>`;
+  const inT = ins.filter((t) => t.status === 'in_transit'), outT = outs.filter((t) => t.status === 'in_transit');
+  const disp = outs.concat(ins).filter((t) => t.status === 'disputed');
+  let kp = '', left = '';
+  if (me.role === 'pengepul') {
+    const l = await api('/api/labels'); const dep = bs.filter((b) => b.kind === 'deposit');
+    kp = kpi('Stok tersedia', kg(sum(avail)), `${avail.length} batch`, 'var(--g700)')
+      + kpi('Menunggu verifikasi', pend.length, 'belum bisa digabung/dikirim', pend.length ? 'var(--amber)' : '')
+      + kpi('Setoran tercatat', dep.length, 'seluruh waktu')
+      + kpi('Kiriman keluar', outT.length, `${disp.length} sengketa`, disp.length ? 'var(--red)' : '')
+      + kpi('Sisa label QR', l.labels.filter((x) => x.status === 'unassigned').length, `kuota ${l.used}/${l.quota} bulan ini`);
+    left = '<div class="card"><h2>Tindakan cepat</h2><div class="btns"><a class="btn pri" href="#/setoran-baru">Catat setoran</a><a class="btn" href="#/batch">Gabung batch</a><a class="btn" href="#/kirim">Kirim ke gudang</a><a class="btn" href="#/label">Cetak label</a></div></div>';
+  } else if (me.role === 'gudang') {
+    const done = bs.filter((b) => b.status === 'processed');
+    kp = kpi('Stok tersedia', kg(sum(avail)), `${avail.length} batch`, 'var(--g700)')
+      + kpi('Kiriman masuk', inT.length, 'menunggu konfirmasi Anda', inT.length ? 'var(--amber)' : '')
+      + kpi('Sudah diolah', done.length, 'batch hasil giling')
+      + kpi('Kiriman keluar', outT.length, 'dalam perjalanan')
+      + kpi('Sengketa', disp.length, 'selisih di luar toleransi', disp.length ? 'var(--red)' : '');
+    left = '<div class="card"><h2>Tindakan cepat</h2><div class="btns"><a class="btn pri" href="#/terima">Terima barang</a><a class="btn" href="#/batch">Giling / simpan</a><a class="btn" href="#/kemasan">Kemas &amp; QR</a><a class="btn" href="#/kirim">Kirim</a></div></div>';
+  } else if (me.role === 'distributor' || me.role === 'retailer') {
+    const dist = me.role === 'distributor';
+    kp = kpi('Stok tersedia', kg(sum(avail)), `${avail.length} batch`, 'var(--g700)')
+      + kpi('Kiriman masuk', inT.length, 'menunggu konfirmasi Anda', inT.length ? 'var(--amber)' : '')
+      + (dist ? kpi('Kiriman keluar', outT.length, 'dalam perjalanan') : kpi('Kiriman diterima', ins.filter((t) => t.status === 'done').length, 'selesai'))
+      + kpi('Sengketa', disp.length, 'selisih di luar toleransi', disp.length ? 'var(--red)' : '');
+    left = `<div class="card"><h2>Tindakan cepat</h2><div class="btns"><a class="btn pri" href="#/terima">Terima barang</a><a class="btn" href="#/batch">${dist ? 'Lihat batch' : 'Stok &amp; asal produk'}</a>${dist ? '<a class="btn" href="#/kirim">Kirim ke retailer</a>' : ''}</div></div>`;
+  } else if (isCar) {
+    const todo = car.filter((t) => t.status === 'in_transit' && !t.pickedAt);
+    const going = car.filter((t) => t.status === 'in_transit' && t.pickedAt && !t.deliveredAt);
+    const fin = car.filter((t) => t.deliveredAt || t.status === 'done');
+    kp = kpi('Perlu diambil', todo.length, 'belum pickup', todo.length ? 'var(--amber)' : '')
+      + kpi('Dalam perjalanan', going.length, 'belum diantar', 'var(--g700)')
+      + kpi('Selesai diantar', fin.length, 'seluruh waktu')
+      + kpi('Total ditugaskan', car.length, 'kiriman');
+    const act = todo.concat(going).slice(0, 6);
+    left = `<div class="card"><h2>Kiriman aktif</h2>${act.length ? act.map((t) => rowItem(`<span class="mono">${esc(t.code)}</span> ${t.pickedAt ? chip('info', 'Dalam perjalanan') : chip('wait', 'Perlu diambil')}<div class="small">${esc(t.from)} → ${esc(t.to)} · ${esc(t.commodity || '')}</div>`)).join('') : '<div class="empty">Tidak ada kiriman aktif</div>'}<div class="btns" style="margin-top:12px"><a class="btn pri" href="#/kiriman">Buka Kiriman Saya</a></div></div>`;
+  }
+  const inbox = isCar || me.role === 'pengepul' ? '' : `<div class="card"><h2>Kiriman masuk menunggu</h2>${inT.length ? trfRows(inT.slice(0, 5)) : '<div class="empty">Tidak ada</div>'}</div>`;
+  const recent = isCar ? '' : `<div class="card"><h2>Batch terbaru</h2>${batchRows(bs.slice(0, 6))}</div>`;
+  m.innerHTML = `<div class="grid g5" style="margin-bottom:16px">${kp}</div><div class="grid ${inbox ? 'g2' : ''}" style="margin-bottom:16px">${left}${inbox}</div>${recent}`;
 };
 
 // ---------- Pengepul: catat setoran ----------

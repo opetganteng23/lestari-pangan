@@ -1,7 +1,7 @@
-@font-face{font-family:Poppins;font-weight:300;src:url(/fonts/Poppins-Light.ttf)}
-@font-face{font-family:Poppins;font-weight:400;src:url(/fonts/Poppins-Regular.ttf)}
-@font-face{font-family:Poppins;font-weight:500;src:url(/fonts/Poppins-Medium.ttf)}
-@font-face{font-family:Poppins;font-weight:600 700;src:url(/fonts/Poppins-Bold.ttf)}
+@font-face{font-family:Poppins;font-weight:300;src:url(/assets/fonts/Poppins-Light.ttf)}
+@font-face{font-family:Poppins;font-weight:400;src:url(/assets/fonts/Poppins-Regular.ttf)}
+@font-face{font-family:Poppins;font-weight:500;src:url(/assets/fonts/Poppins-Medium.ttf)}
+@font-face{font-family:Poppins;font-weight:600 700;src:url(/assets/fonts/Poppins-Bold.ttf)}
 :root{--g900:#12472A;--g800:#1B5E34;--g700:#237A41;--g600:#2E9150;--g200:#BFE0CA;--g100:#E6F2EA;--g50:#F3F9F5;--gold:#F2B21B;--gold100:#FDF3D6;--ink:#1C2B22;--mut:#5F7066;--line:#E2E9E4;--bg:#F5F8F6;--red:#C62F2F;--red100:#FBE8E8;--amber:#9A6212;--amber100:#FEF1D6;--blue:#245FA3;--blue100:#E5EEF9}
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}

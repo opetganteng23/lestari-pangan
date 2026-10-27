@@ -25,9 +25,33 @@ Kode referral demo: `PENGEPUL-DEMO1`, `GUDANG-DEMO1`, `RETAILER-DEMO1`.
 Halaman konsumen (tanpa login): `/t/LP-PKG-2026-0211` (QR-nya ada di menu Pengemasan & QR gudang).
 
 ## Struktur
-- `server/` — HTTP (modul bawaan Node), `domain.js` (aturan bisnis), `ledger.js` (anchor), `analytics.js`, `store.js` (data), `seed.js`
-- `public/` — antarmuka (HTML/CSS/JS murni), `trace.html` halaman konsumen
-- `test/smoke.js` — uji end-to-end
+```
+lestari-pangan/
+├─ server/                 backend (modul bawaan Node)
+│  ├─ index.js             server HTTP + sesi
+│  ├─ routes.js            endpoint + izin per peran
+│  ├─ domain.js            aturan bisnis
+│  ├─ ledger.js            anchor hash-chain (simulasi)
+│  ├─ analytics.js         metrik + ringkasan
+│  ├─ store.js             penyimpanan JSON / MongoDB
+│  ├─ auth.js · qr.js · seed.js · paths.js
+│  └─ vendor/qr/           pustaka QR
+├─ public/                 frontend (HTML/CSS/JS murni)
+│  ├─ index.html           aplikasi (SPA)
+│  ├─ trace.html           halaman konsumen
+│  ├─ css/app.css
+│  ├─ js/core.js           util, API, sesi, layout, menu per peran
+│  ├─ js/screens-actor.js  layar pelaku rantai pasok + detail batch
+│  ├─ js/screens-admin.js  layar admin, pengawas, super admin, pengguna
+│  └─ assets/fonts · img
+├─ test/smoke.js           uji end-to-end
+├─ docs/mts.md             Master Technical Specification
+├─ docs/fitur-per-peran.md
+└─ data/                   data runtime (di-ignore git)
+```
+
+## Dokumen
+- [MTS](docs/mts.md) · [Fitur per peran](docs/fitur-per-peran.md)
 
 ## Konfigurasi opsional (variabel lingkungan)
 - `PORT` (3000) · `APP_SECRET` · `LP_DATA_DIR`

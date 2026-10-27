@@ -130,6 +130,64 @@ module.exports = function build(D, A) {
   add('POST', '/api/integrity/tamper', async (c) => { need(c, ['admin'], true); if (process.env.DEMO_MODE === '0') throw forbid('Dinonaktifkan'); const e = await col.events.findOne({ _id: c.body.eventId }); if (!e || !e.payload) throw notFound('Event tidak ada'); const k = Object.keys(e.payload).find((x) => typeof e.payload[x] === 'number'); if (!k) throw bad('Event tanpa angka'); const orig = e.__orig || JSON.parse(JSON.stringify(e.payload)); const p = { ...e.payload, [k]: e.payload[k] + 100 }; await col.events.update({ _id: e._id }, { payload: p, __orig: orig }); await D.audit(c, 'demo.tamper', e._id); return { ok: true, field: k }; });
   add('POST', '/api/integrity/restore', async (c) => { need(c, ['admin'], true); for (const e of await col.events.find({})) if (e.__orig) await col.events.update({ _id: e._id }, { payload: e.__orig, __orig: null }); return { ok: true }; });
 
+  // ----- manajemen pengguna (admin) -----
+  const USER_ROLES = [...ACTOR_ROLES, 'admin', 'pengawas'];
+  const pubU = (u, a) => ({ _id: u._id, name: u.name, email: u.email, role: u.role, active: u.active !== false, actorId: u.actorId, district: a?.district || '', lastLogin: u.lastLogin || null });
+  const emailOk = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+  async function userGuard(c, id) {
+    const u = await col.users.findOne({ _id: id }); if (!u) throw notFound('Pengguna tidak ditemukan');
+    if (u.role === 'superadmin') throw forbid('Akun super admin tidak bisa dikelola dari sini');
+    if (c.user && c.user._id === u._id) throw forbid('Tidak bisa mengubah akun Anda sendiri dari sini');
+    return u;
+  }
+  add('GET', '/api/users', async (c) => {
+    need(c, ['admin']); const as = await names();
+    return (await col.users.find({}, { sort: { name: 1 } })).filter((u) => u.role !== 'superadmin').map((u) => pubU(u, as[u.actorId]));
+  });
+  add('POST', '/api/users', async (c) => {
+    need(c, ['admin'], true); const b = c.body;
+    if (!USER_ROLES.includes(b.role)) throw bad('Peran tidak valid');
+    const email = String(b.email || '').toLowerCase().trim();
+    if (!b.name || !emailOk(email)) throw bad('Nama dan email yang valid wajib diisi');
+    if (!b.password || String(b.password).length < 8) throw bad('Kata sandi minimal 8 karakter');
+    if (await col.users.findOne({ email })) throw conflict('Email sudah terdaftar');
+    let actor = null;
+    if (ACTOR_ROLES.includes(b.role)) actor = await col.actors.insert({ name: b.name, role: b.role, district: b.district || '', lat: +b.lat || -6.6, lng: +b.lng || 107.6, createdAt: D.now() });
+    const u = await col.users.insert({ email, passwordHash: auth.hashPassword(String(b.password)), name: b.name, role: b.role, actorId: actor?._id || null, active: true });
+    await D.audit(c, 'pengguna.buat', `${email} (${b.role})`); return pubU(u, actor);
+  });
+  add('PUT', '/api/users/:id', async (c) => {
+    need(c, ['admin'], true); const u = await userGuard(c, c.params.id); const b = c.body, p = {};
+    if ('name' in b) { if (!String(b.name).trim()) throw bad('Nama wajib'); p.name = String(b.name).trim(); }
+    if ('email' in b) { const e = String(b.email).toLowerCase().trim(); if (!emailOk(e)) throw bad('Email tidak valid'); const x = await col.users.findOne({ email: e }); if (x && x._id !== u._id) throw conflict('Email sudah terdaftar'); p.email = e; }
+    if ('active' in b) p.active = !!b.active;
+    if (b.password) { if (String(b.password).length < 8) throw bad('Kata sandi minimal 8 karakter'); p.passwordHash = auth.hashPassword(String(b.password)); }
+    if ('role' in b && b.role !== u.role) {
+      if (!USER_ROLES.includes(b.role)) throw bad('Peran tidak valid');
+      if (u.actorId) throw bad('Peran pelaku rantai pasok tidak bisa diubah karena sudah punya riwayat; nonaktifkan lalu buat akun baru');
+      if (ACTOR_ROLES.includes(b.role)) throw bad('Peran internal tidak bisa diubah menjadi pelaku rantai pasok; buat akun baru');
+      p.role = b.role;
+    }
+    if (u.actorId && ('name' in p || 'district' in b)) { const ap = {}; if (p.name) ap.name = p.name; if ('district' in b) ap.district = String(b.district || ''); await col.actors.update({ _id: u.actorId }, ap); }
+    await col.users.update({ _id: u._id }, p);
+    await D.audit(c, 'pengguna.ubah', `${u.email}: ${Object.keys(p).map((k) => (k === 'passwordHash' ? 'password' : k)).join(', ') || 'wilayah'}`);
+    return { ok: true };
+  });
+  add('DELETE', '/api/users/:id', async (c) => {
+    need(c, ['admin'], true); const u = await userGuard(c, c.params.id);
+    if (u.actorId) {
+      const used = (await col.batches.count({ ownerActorId: u.actorId })) + (await col.transfers.count({ fromActorId: u.actorId })) + (await col.transfers.count({ toActorId: u.actorId })) + (await col.deposits.count({ actorId: u.actorId }));
+      if (used) throw conflict('Pengguna punya riwayat transaksi, jadi tidak bisa dihapus. Nonaktifkan saja agar jejak audit tetap utuh.');
+      await col.actors.remove({ _id: u.actorId });
+    }
+    await col.users.remove({ _id: u._id }); await D.audit(c, 'pengguna.hapus', u.email); return { ok: true };
+  });
+  add('DELETE', '/api/groups/:id', async (c) => {
+    need(c, ['admin'], true); const g = await col.farmerGroups.findOne({ _id: c.params.id }); if (!g) throw notFound('Kelompok tani tidak ditemukan');
+    const dep = (await col.deposits.find({})).some((d) => d.farmerGroupId === g._id); if (dep) throw conflict('Kelompok tani sudah punya setoran. Nonaktifkan saja.');
+    await col.farmerGroups.remove({ _id: g._id }); await D.audit(c, 'kelompok_tani.hapus', g.name); return { ok: true };
+  });
+
   // ----- QR -----
   add('GET', '/api/qr', async (c) => ({ svg: qr.svg(c.query.text || '') }), { public: true });
   return R;

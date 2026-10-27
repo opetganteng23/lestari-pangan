@@ -1,5 +1,5 @@
 {
-  "name": "lestaripangan",
+  "name": "lestari-pangan",
   "version": "0.1.0",
   "description": "LestariPangan — prototipe traceability pangan (Tim TechTonic). Satu proyek Node.js: backend + frontend.",
   "main": "server/index.js",

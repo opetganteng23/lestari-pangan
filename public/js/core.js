@@ -44,11 +44,11 @@ const NAV = {
   pengepul: [['beranda', 'Beranda'], ['setoran-baru', 'Catat Setoran'], ['setoran', 'Setoran Saya'], ['batch', 'Batch & Gabung'], ['kirim', 'Kirim & Transfer'], ['label', 'QR Label']],
   gudang: [['beranda', 'Beranda'], ['terima', 'Terima Barang'], ['batch', 'Batch & Lineage'], ['kemasan', 'Pengemasan & QR'], ['kirim', 'Kirim']],
   distributor: [['beranda', 'Beranda'], ['terima', 'Terima Barang'], ['batch', 'Batch'], ['kirim', 'Kirim ke Retailer']],
-  logistik: [['kiriman', 'Kiriman Saya']],
+  logistik: [['beranda', 'Beranda'], ['kiriman', 'Kiriman Saya']],
   retailer: [['beranda', 'Beranda'], ['terima', 'Terima Barang'], ['batch', 'Stok & Asal Produk']],
-  admin: [['beranda', 'Beranda'], ['verifikasi', 'Antrean Verifikasi', 'pending'], ['pelaku', 'Pelaku & Kode Referral'], ['kelompok', 'Kelompok Tani'], ['sengketa', 'Sengketa Transfer', 'disputed'], ['integritas', 'Integritas Blockchain'], ['konfigurasi', 'Konfigurasi'], ['audit', 'Audit Log']],
+  admin: [['beranda', 'Beranda'], ['verifikasi', 'Antrean Verifikasi', 'pending'], ['pengguna', 'Pengguna'], ['pelaku', 'Pelaku & Kode Referral'], ['kelompok', 'Kelompok Tani'], ['sengketa', 'Sengketa Transfer', 'disputed'], ['integritas', 'Integritas Blockchain'], ['konfigurasi', 'Konfigurasi'], ['audit', 'Audit Log']],
   pengawas: [['dashboard', 'Dashboard'], ['tracelog', 'Trace Log'], ['anomali', 'Anomali'], ['tren', 'Tren Pasokan'], ['integritas', 'Integritas Blockchain'], ['audit', 'Audit Log']],
-  superadmin: [['mode-tindak', 'Mode Tindak'], ['mode-lihat', 'Mode Lihat'], ['dashboard', 'Dashboard Pengawasan'], ['verifikasi', 'Antrean Verifikasi', 'pending'], ['pelaku', 'Pelaku & Kode Referral'], ['kelompok', 'Kelompok Tani'], ['sengketa', 'Sengketa Transfer', 'disputed'], ['tracelog', 'Trace Log'], ['anomali', 'Anomali'], ['tren', 'Tren Pasokan'], ['integritas', 'Integritas Blockchain'], ['konfigurasi', 'Konfigurasi'], ['audit', 'Audit Log']],
+  superadmin: [['mode-tindak', 'Mode Tindak'], ['mode-lihat', 'Mode Lihat'], ['dashboard', 'Dashboard Pengawasan'], ['verifikasi', 'Antrean Verifikasi', 'pending'], ['pengguna', 'Pengguna'], ['pelaku', 'Pelaku & Kode Referral'], ['kelompok', 'Kelompok Tani'], ['sengketa', 'Sengketa Transfer', 'disputed'], ['tracelog', 'Trace Log'], ['anomali', 'Anomali'], ['tren', 'Tren Pasokan'], ['integritas', 'Integritas Blockchain'], ['konfigurasi', 'Konfigurasi'], ['audit', 'Audit Log']],
 };
 
 // ---------- sesi ----------
@@ -63,7 +63,7 @@ function leaveMode() { ss.set('lp_act', null); ss.set('lp_view', null); location
 
 function renderLogin() {
   const accs = [['sa@lestari.id', 'Super Admin', 'Semua fitur semua peran'], ['admin@lestari.id', 'Admin Teknis', 'Verifikasi, referral, sengketa'], ['pengawas@lestari.id', 'Pengawas (Dinas)', 'Dashboard dan analitik, baca-saja'], ['pengepul1@lestari.id', 'Pengepul · CV Tani Makmur', 'Catat setoran, QR hulu'], ['gudang1@lestari.id', 'Penggilingan Sinar Jaya', 'Terima, giling, kemas'], ['distributor@lestari.id', 'Distributor', 'Teruskan ke retailer'], ['logistik@lestari.id', 'Logistik', 'Pengangkut'], ['retailer@lestari.id', 'Retailer', 'Terima dan jual']];
-  $('#root').innerHTML = `<div class="login"><div class="box"><div class="l"><div class="brand" style="padding:0 0 18px"><img src="/img/emblem.png" alt=""><div><b>Lestari<span>Pangan</span></b><small>Traceability pangan dari sawah sampai meja makan</small></div></div>
+  $('#root').innerHTML = `<div class="login"><div class="box"><div class="l"><div class="brand" style="padding:0 0 18px"><img src="/assets/img/emblem.png" alt=""><div><b>Lestari<span>Pangan</span></b><small>Traceability pangan dari sawah sampai meja makan</small></div></div>
   <h2 style="font-size:20px;color:var(--g900);margin-bottom:4px">Masuk</h2><p class="small">Prototipe · semua data adalah <b>simulasi</b></p>
   <form id="lf"><label class="f">Email</label><input class="inp" name="email" type="email" required autocomplete="username" value=""><label class="f">Kata sandi</label><input class="inp" name="password" type="password" required autocomplete="current-password"><div class="btns" style="margin-top:16px"><button class="btn pri" style="flex:1">Masuk</button></div></form>
   <p class="small" style="margin-top:16px">Pengepul atau pihak baru? <a href="#" id="reg">Daftar dengan kode referral</a></p>
@@ -81,7 +81,7 @@ async function renderApp() {
   let counts = {};
   if (['admin', 'superadmin'].includes(role)) { try { counts = { pending: (await api('/api/verifications')).length, disputed: (await api('/api/transfers?box=disputed')).filter((t) => t.status === 'disputed').length }; } catch {} }
   const banner = me.act ? `<div class="ban">Mode Tindak aktif · bertindak sebagai ${esc(ROLE[me.act.role])} · ${esc(me.actor?.name)} · berakhir <b id="cd"></b><span class="small" style="color:#5a4300">Alasan: ${esc(me.act.reason)}</span><button class="btn sm" onclick="leaveMode()">Keluar Mode Tindak</button></div>` : me.readOnly ? `<div class="ban view">Mode Lihat · melihat sebagai ${esc(ROLE[me.role])} · ${esc(me.actor?.name)} · baca-saja, tercatat di audit log<button class="btn sm" onclick="leaveMode()">Keluar Mode Lihat</button></div>` : '';
-  $('#root').innerHTML = `<div class="app"><div class="side"><div class="brand"><img src="/img/emblem.png" alt=""><div><b>Lestari<span>Pangan</span></b><small>Traceability pangan</small></div></div><div class="sec">${esc(ROLE[role])}</div>
+  $('#root').innerHTML = `<div class="app"><div class="side"><div class="brand"><img src="/assets/img/emblem.png" alt=""><div><b>Lestari<span>Pangan</span></b><small>Traceability pangan</small></div></div><div class="sec">${esc(ROLE[role])}</div>
   ${nav.map((n) => `<a class="nav" href="#/${n[0]}" data-r="${n[0]}"><i></i>${esc(n[1])}${n[2] && counts[n[2]] ? `<span class="badge">${counts[n[2]]}</span>` : ''}</a>`).join('')}
   <div class="foot">${esc(me.store)}<br>Ledger: ${esc(me.network)}<br>Analitik: ${me.ai === 'claude' ? 'Claude' : 'berbasis aturan'}</div></div>
   <div class="col"><div class="top"><h1 id="ttl"></h1><span class="demo">DATA SIMULASI</span><div class="sp"></div><div style="position:relative"><button class="bell" id="bell" title="Notifikasi">&#128276;<b id="bn" style="display:none"></b></button><div class="pop" id="pop" style="display:none"></div></div>
