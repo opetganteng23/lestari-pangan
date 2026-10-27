@@ -1,0 +1,96 @@
+# Status implementasi terhadap MTS v0.3
+
+Dibandingkan dari [mts.md](mts.md) terhadap kode di repositori. Pembacaan kode berbasis inspeksi dan uji smoke, bukan audit penuh.
+
+Legenda: **Ada** = berfungsi dan teruji smoke; **Sebagian** = ada versi dasar; **Belum** = tidak ada di kode.
+
+## Ringkasan
+
+| Status | Jumlah baris |
+|---|---|
+| Ada | 15 |
+| Sebagian | 13 |
+| Belum | 40 |
+
+## Per bagian MTS
+
+| # | Butir | Status | Catatan |
+|---|---|---|---|
+| 3 | Peran & akses: 8 peran, Mode Lihat/Tindak, CRUD pengguna | Ada | Mode Tindak minta sandi, alasan, 15 menit |
+| 3 | Akses per objek: Pembatasan data per pelaku | Sebagian | Pelaku hanya melihat batch/transfer miliknya; belum diuji menyeluruh |
+| 4 | Arsitektur modular monolith | Ada | Satu proyek Node, modul terpisah |
+| 5 | Event, batch, lineage, status | Ada | Ada koleksi `events`, `batches.parents` |
+| 5 | Entitas `cases`, `products`, `documents`, `processing-runs` | Belum | Proses penggilingan disimpan sebagai batch + event |
+| 6.1–6.5 | Setoran, verifikasi, gabung, transfer 2 pihak, giling, kemas | Ada | Alur lengkap teruji |
+| 6.5 | Produk samping dan susut pada penggilingan | Belum | Hanya input dan output utama |
+| 6.6 | Recall / investigasi lot | Belum | Hanya `voided` pada batch/label |
+| 6.7 | Halaman konsumen via QR | Ada | `/t/<kode>` |
+| 7.1–7.2 | Event ledger + hash-chain | Ada |  |
+| 7.3 | Anchoring blockchain testnet | Belum | Yang ada: hash-chain lokal simulasi |
+| 7.4 | Adapter ledger | Sebagian | Antarmuka `anchor/lookup/verifyChain` ada, adapter EVM belum |
+| 8 | Digital Product Passport | Sebagian | Halaman trace punya komposisi, langkah, integritas; belum ada status verifikasi per tahap, dokumen publik, recall, catatan keterbatasan |
+| 8.3 | Product Journey Replay (interaktif, peta) | Belum |  |
+| 8.4 | QR: void, deteksi scan berulang, GS1 Digital Link | Sebagian | Void ada; scan berulang dan GS1 belum |
+| 9 | Mass Balance (rumus, produk samping, susut, koreksi, ekspor) | Sebagian | Hanya rendemen dan ambang `yieldAlertPct` |
+| 10.2 | Rule-based anomaly | Ada | 6 jenis + transfer menggantung |
+| 10.2 | AI Analytics Narrator | Sebagian | Ditulis, belum diuji dengan API asli |
+| 10.2 | AI Investigation Copilot | Belum |  |
+| 10.2 | Evidence OCR / Image Evidence | Belum |  |
+| 10.5 | Evaluasi AI | Belum |  |
+| 11.2 | Anomali perluasan (lineage tak lengkap, output > input, dokumen ganda, stok tanpa event, akun menyimpang) | Belum |  |
+| 11.3 | Skor risiko | Belum |  |
+| 11.4 | Risk dashboard (ID kasus, SLA, penanggung jawab, status) | Sebagian | Daftar anomali ada; tanpa kasus, PIC, SLA, tindak lanjut |
+| 12 | Forecasting & Digital Twin | Belum | Ada tren pasokan 8 minggu, bukan forecasting |
+| 13 | Portal kelompok tani | Belum | Kelompok tani hanya master data tanpa akun |
+| 14 | Investigation Workspace & Smart Recall | Belum |  |
+| 15.1–15.2 | Notifikasi dalam aplikasi | Ada | Lonceng + badge |
+| 15.2 | Notifikasi email | Belum | SMTP hanya menandai antrean |
+| 15.3 | Job idempotent, backoff, dead-letter, status kirim | Sebagian | Outbox anchor dengan retry; belum untuk notifikasi |
+| 16.1 | Prefix `/api/v1` | Belum | Saat ini `/api` |
+| 16.1 | Validasi skema request | Belum | Validasi manual per endpoint |
+| 16.1 | Pagination & filter daftar | Belum | Sebagian daftar dibatasi `limit` |
+| 16.1 | Idempotency key | Belum |  |
+| 16.1 | Rate limiting | Belum |  |
+| 16.1 | OpenAPI | Belum |  |
+| 16.1 | API client/partner dengan scope | Belum |  |
+| 16.2 | Auth: logout, refresh, reset sandi | Belum | Hanya login |
+| 16.2 | Endpoint `/cases`, `/exports`, `/ai`, `/integrations`, `/anchors`, `/products/:id/passport` | Belum |  |
+| 17.1 | Hash sandi (scrypt) | Ada |  |
+| 17.1 | Token sesi bertanda tangan, masa berlaku | Sebagian | 12 jam; tanpa pencabutan sesi / refresh |
+| 17.1 | Perlindungan brute-force | Belum |  |
+| 17.1 | Autentikasi ulang aksi sensitif | Sebagian | Hanya Mode Tindak |
+| 17.1 | MFA akun istimewa | Belum |  |
+| 17.1 | Batas ukuran request, nama file acak | Ada | 8 MB; foto maks 2,5 MB |
+| 17.1 | Validasi MIME dari isi file | Sebagian | Cek prefiks data-URL, bukan isi file |
+| 17.1 | Penyimpanan bukti privat + signed URL | Belum | `/uploads/` publik (nama acak) |
+| 17.1 | CSRF / CORS ketat | Belum | Bearer di header (CSRF kecil risikonya); CORS belum diatur eksplisit |
+| 17.1 | Security headers (CSP, HSTS, dll.) | Belum |  |
+| 17.1 | Error tanpa stack trace | Ada |  |
+| 17.1 | Scan dependensi, backup terenkripsi | Belum |  |
+| 17.2 | Klasifikasi data, retensi, log akses dokumen | Belum |  |
+| 17.3 | Mode Lihat baca-saja, Mode Tindak + banner + audit + notifikasi | Ada |  |
+| 17.3 | Pencabutan sesi mode istimewa | Belum | Kedaluwarsa otomatis saja |
+| 17.4 | Backup / restore / RPO-RTO | Belum |  |
+| 18 | UI responsif, dashboard per peran | Ada | Admin, pengawas, 5 peran pelaku |
+| 18 | Peta sebaran | Sebagian | SVG skematis, belum Leaflet |
+| 18 | Design system terdokumentasi | Belum |  |
+| 19.1 | Metrik operasional dasar | Sebagian | Tanpa persentil waktu verifikasi, usia kasus, kualitas data |
+| 19.2–19.3 | Laporan & ekspor CSV/XLSX/PDF | Belum |  |
+| 20 | Konfigurasi env + operasional | Ada | Tujuh kunci konfigurasi |
+| 21 | Uji smoke end-to-end | Ada |  |
+| 21 | Uji unit, integrasi terpisah, UI, beban, keamanan | Belum |  |
+| 22 | Deployment, observability (log terstruktur, metrik, health check) | Belum | Tidak ada `/health` |
+| – | Offline-first | Belum |  |
+| – | Pemindaian QR kamera | Belum |  |
+| – | Ganti sandi mandiri / profil pengguna | Belum | Admin bisa reset |
+| – | Integrasi timbangan / logistik pihak ketiga | Belum |  |
+
+## Prioritas yang disarankan (mengikuti roadmap v0.3)
+
+| Fase | Pekerjaan | Alasan |
+|---|---|---|
+| 1 Secure Foundation | Rate limit login, ganti/reset sandi, logout/pencabutan sesi, security headers, `/health`, backup | Syarat sebelum pilot |
+| 1 Secure Foundation | Validasi skema request, uji unit/integrasi | Menutup risiko regresi |
+| 2 Verifiable Traceability | DPP lengkap (status verifikasi per tahap), lineage hulu/hilir, uji adapter testnet | Inti nilai produk |
+| 3 Operational Intelligence | Mass balance penuh, kasus/investigasi, ekspor CSV, email, Copilot read-only | Nilai bagi admin/pengawas |
+| 4–5 | Portal petani, API partner, offline, forecasting | Setelah data nyata ada |
