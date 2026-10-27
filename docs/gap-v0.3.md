@@ -9,8 +9,8 @@ Legenda: **Ada** = berfungsi dan teruji smoke; **Sebagian** = ada versi dasar; *
 | Status | Jumlah baris |
 |---|---|
 | Ada | 21 |
-| Sebagian | 19 |
-| Belum | 28 |
+| Sebagian | 20 |
+| Belum | 27 |
 
 ## Per bagian MTS
 
@@ -19,7 +19,7 @@ Legenda: **Ada** = berfungsi dan teruji smoke; **Sebagian** = ada versi dasar; *
 | 3 | Peran & akses: 8 peran, Mode Lihat/Tindak, CRUD pengguna | Ada | Mode Tindak minta sandi, alasan, 15 menit |
 | 3 | Akses per objek: Pembatasan data per pelaku | Sebagian | Pelaku hanya melihat batch/transfer miliknya; belum diuji menyeluruh |
 | 4 | Arsitektur modular monolith | Ada | Satu proyek Node, modul terpisah |
-| 5 | Event, batch, lineage, status | Ada | Ada koleksi `events`, `batches.parents` |
+| 5 | Event, batch, lineage, status | Ada | Koleksi `events`, `batches.parents`; query lineage hulu/hilir dan verifikasi integritas per batch (`/api/batches/:id/lineage`, `/integrity`) |
 | 5 | Entitas `cases`, `products`, `documents`, `processing-runs` | Belum | Proses penggilingan disimpan sebagai batch + event |
 | 6.1–6.5 | Setoran, verifikasi, gabung, transfer 2 pihak, giling, kemas | Ada | Alur lengkap teruji |
 | 6.5 | Produk samping dan susut pada penggilingan | Belum | Hanya input dan output utama |
@@ -27,10 +27,10 @@ Legenda: **Ada** = berfungsi dan teruji smoke; **Sebagian** = ada versi dasar; *
 | 6.7 | Halaman konsumen via QR | Ada | `/t/<kode>` |
 | 7.1–7.2 | Event ledger + hash-chain | Ada |  |
 | 7.3 | Anchoring blockchain testnet | Belum | Yang ada: hash-chain lokal simulasi |
-| 7.4 | Adapter ledger | Sebagian | Antarmuka `anchor/lookup/verifyChain` ada, adapter EVM belum |
-| 8 | Digital Product Passport | Sebagian | Halaman trace punya komposisi, langkah, integritas; belum ada status verifikasi per tahap, dokumen publik, recall, catatan keterbatasan |
+| 7.4 | Adapter ledger | Sebagian | Pemilihan adapter lewat `LEDGER_ADAPTER` (`local` teruji; `evm` + `contracts/LPAnchor.sol` ditulis, **belum diuji di testnet**); ada uji kepatuhan antarmuka `test/ledger.js` |
+| 8 | Digital Product Passport | Sebagian | Status verifikasi per tahap, keterbatasan data, dan label ledger simulasi sudah ada; dokumen publik yang disetujui dan info recall belum |
 | 8.3 | Product Journey Replay (interaktif, peta) | Belum |  |
-| 8.4 | QR: void, deteksi scan berulang, GS1 Digital Link | Sebagian | Void ada; scan berulang dan GS1 belum |
+| 8.4 | QR: void, deteksi scan berulang, GS1 Digital Link | Sebagian | Void dan deteksi pemindaian berulang (anomali `scan_berulang`) ada; GS1 Digital Link belum |
 | 9 | Mass Balance (rumus, produk samping, susut, koreksi, ekspor) | Sebagian | Hanya rendemen dan ambang `yieldAlertPct` |
 | 10.2 | Rule-based anomaly | Ada | 6 jenis + transfer menggantung |
 | 10.2 | AI Analytics Narrator | Sebagian | Ditulis, belum diuji dengan API asli |
@@ -62,7 +62,7 @@ Legenda: **Ada** = berfungsi dan teruji smoke; **Sebagian** = ada versi dasar; *
 | 17.1 | MFA akun istimewa | Belum |  |
 | 17.1 | Batas ukuran request, nama file acak | Ada | 8 MB; foto maks 2,5 MB |
 | 17.1 | Validasi MIME dari isi file | Ada | Tipe gambar ditentukan dari byte awal berkas |
-| 17.1 | Penyimpanan bukti privat + signed URL | Belum | `/uploads/` publik (nama acak) |
+| 17.1 | Penyimpanan bukti privat + signed URL | Sebagian | Foto bukti hanya lewat URL bertanda tangan berumur 15 menit; masih di disk lokal, belum object storage terenkripsi |
 | 17.1 | CSRF / CORS ketat | Sebagian | Token di header Authorization (bukan cookie); tidak ada CORS lintas origin; CSP `frame-ancestors none` |
 | 17.1 | Security headers (CSP, HSTS, dll.) | Ada | CSP, nosniff, X-Frame-Options, Referrer-Policy, Permissions-Policy, HSTS di balik https |
 | 17.1 | Error tanpa stack trace | Ada |  |

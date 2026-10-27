@@ -1,7 +1,7 @@
 // Data SIMULASI: semua nama, angka, dan lokasi fiktif. Kata sandi semua akun demo: lestari123
 const fs = require('fs'), path = require('path');
 const { hashPassword, sha256 } = require('./auth');
-const ledger = require('./ledger');
+const ledger = require('./ledger/index');
 const H = 3600e3, ago = (h) => new Date(Date.now() - h * H).toISOString();
 const svgPhoto = (label, sub, color) => `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420" viewBox="0 0 640 420"><rect width="640" height="420" fill="${color}"/><rect x="40" y="40" width="560" height="340" rx="18" fill="#fff" opacity=".85"/><text x="320" y="190" text-anchor="middle" font-family="Poppins,Arial" font-size="34" font-weight="700" fill="#12472A">${label}</text><text x="320" y="235" text-anchor="middle" font-family="Poppins,Arial" font-size="20" fill="#5F7066">${sub}</text><text x="320" y="350" text-anchor="middle" font-family="Poppins,Arial" font-size="16" fill="#9A6212">FOTO SIMULASI</text></svg>`;
 

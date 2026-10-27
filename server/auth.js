@@ -22,5 +22,8 @@ function verify(token) {
   const p = JSON.parse(Buffer.from(body, 'base64url').toString());
   return p.exp > Date.now() / 1000 ? p : null;
 }
+// URL bertanda tangan berumur pendek untuk berkas bukti (foto nota/timbangan)
+function signUrl(p, ttlSec = 900) { const e = Math.floor(Date.now() / 1000) + ttlSec; const s = crypto.createHmac('sha256', SECRET).update(p + '|' + e).digest('base64url'); return p + '?e=' + e + '&s=' + s; }
+function verifyUrl(p, e, s) { if (!e || !s || +e < Date.now() / 1000) return false; const x = crypto.createHmac('sha256', SECRET).update(p + '|' + e).digest('base64url'); return s.length === x.length && crypto.timingSafeEqual(Buffer.from(s), Buffer.from(x)); }
 const sha256 = (s) => crypto.createHash('sha256').update(s).digest('hex');
-module.exports = { hashPassword, checkPassword, sign, verify, sha256 };
+module.exports = { signUrl, verifyUrl, hashPassword, checkPassword, sign, verify, sha256 };

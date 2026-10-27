@@ -93,5 +93,33 @@ const { start } = require('../server/index.js');
     const fake = 'data:image/png;base64,' + Buffer.from('<?php echo 1; ?>').toString('base64');
     const r = await call('/api/deposits', { method: 'POST', token: T.pengepul1, body: { farmerGroupId: g._id, groupCode: 'SUM-4821', weightKg: 100, notaNo: 'FAKE-1', notaPhoto: fake, scalePhoto: fake } }); assert.strictEqual(r.status, 400);
   });
+  await t('paspor produk: tingkat verifikasi per tahap + keterbatasan', async () => {
+    const p = (await call('/api/products/LP-PKG-2026-0211/passport')).j;
+    assert.ok(p.steps.length && p.steps.every((x) => x.verification && x.verification.level)); assert.ok(p.limitations.length >= 3); assert.strictEqual(p.ledger.simulated, true);
+    assert.ok(p.limitations.some((x) => /bukan dari sawah/.test(x))); assert.ok(p.steps.some((x) => x.verification.level === 'self_reported'));
+    assert.ok(!JSON.stringify(p).includes('/uploads/'));
+  });
+  await t('lineage hulu/hilir dan verifikasi integritas batch', async () => {
+    const pk = (await call('/api/batches', { token: T.gudang1 })).j.find((b) => b.kind === 'packaged'); assert.ok(pk);
+    const l = (await call('/api/batches/' + pk._id + '/lineage', { token: T.admin })).j; assert.ok(l.upstream.length >= 2); assert.strictEqual(l.batch.code, pk.code);
+    const root = l.upstream.find((x) => x.kind === 'deposit'); const lr = (await call('/api/batches/' + root._id + '/lineage', { token: T.admin })).j; assert.ok(lr.downstream.some((x) => x._id === pk._id));
+    const v = (await call('/api/batches/' + pk._id + '/integrity', { token: T.admin })).j; assert.strictEqual(v.ok, true); assert.ok(v.checked > 0 && v.summary.tampered === 0);
+    assert.strictEqual((await call('/api/batches/' + pk._id + '/lineage', { token: T.retailer })).status, 200);
+    assert.strictEqual((await call('/api/batches/' + pk._id + '/lineage')).status, 401);
+    const ev = (await call('/api/events?batchId=' + pk._id, { token: T.admin })).j.find((e) => e.anchorStatus === 'confirmed'); assert.ok(ev);
+    const tp = await call('/api/integrity/tamper', { method: 'POST', token: T.admin, body: { eventId: ev._id } });
+    if (tp.status === 200) { const v2 = (await call('/api/batches/' + pk._id + '/integrity', { token: T.admin })).j; assert.strictEqual(v2.ok, false); assert.ok(v2.summary.ledger_mismatch + v2.summary.tampered > 0); await call('/api/integrity/restore', { method: 'POST', token: T.admin }); assert.strictEqual((await call('/api/batches/' + pk._id + '/integrity', { token: T.admin })).j.ok, true); }
+  });
+  await t('berkas bukti hanya lewat URL bertanda tangan', async () => {
+    const q = (await call('/api/verifications', { token: T.admin })).j.find((x) => x.notaPhoto || x.scalePhoto); assert.ok(q, 'ada setoran dengan foto');
+    const url = q.notaPhoto || q.scalePhoto; assert.ok(url.includes('?e=') && url.includes('&s=')); const plain = url.split('?')[0];
+    assert.strictEqual((await fetch(base + plain)).status, 403); assert.strictEqual((await fetch(base + plain + '?e=1&s=x')).status, 403);
+    const ok = await fetch(base + url); assert.strictEqual(ok.status, 200); assert.ok((ok.headers.get('content-type') || '').startsWith('image/'));
+  });
+  await t('pemindaian berulang memicu anomali (sinyal, bukan bukti)', async () => {
+    await call('/api/config', { method: 'PUT', token: T.admin, body: { scanAlertPerDay: 3 } });
+    for (let i = 0; i < 5; i++) await call('/api/public/trace/LP-PKG-2026-0211');
+    const d = (await call('/api/dashboard', { token: T.pengawas })).j; assert.ok(d.anomalies.some((a) => a.type === 'scan_berulang'));
+  });
   await s.close(); console.log(fails ? `\n${fails} uji gagal` : '\nSemua uji lulus'); process.exit(fails ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(1); });

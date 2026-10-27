@@ -7,7 +7,8 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; cha
 async function start({ port = +process.env.PORT || 3000, dataDir = DATA, seed = true } = {}) {
   const store = await openStore(dataDir); const D = createDomain(store); const A = createAnalytics(D); A.storeKind = store.kind;
   if (seed && (await store.isEmpty())) { await require('./seed')(D); console.log('Data simulasi dimuat.'); }
-  const routes = buildRoutes(D, A); const apiLimiter = sec.createLimiter({ max: +process.env.RATE_LIMIT_PER_MIN || 600, windowMs: 60000 }); const TRUST = process.env.TRUST_PROXY === '1';
+  D.prov = require('./provenance')(D); const routes = buildRoutes(D, A);
+  const signDeep = (v) => (typeof v === 'string' ? (v.startsWith('/uploads/') && !v.includes('?') ? auth.signUrl(v) : v) : Array.isArray(v) ? v.map(signDeep) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, signDeep(x)])) : v); const apiLimiter = sec.createLimiter({ max: +process.env.RATE_LIMIT_PER_MIN || 600, windowMs: 60000 }); const TRUST = process.env.TRUST_PROXY === '1';
   const clientIp = (req) => (TRUST && String(req.headers['x-forwarded-for'] || '').split(',')[0].trim()) || req.socket.remoteAddress || '?';
   const send = (res, code, body, headers = {}) => { const b = typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body); res.writeHead(code, { 'content-type': typeof body === 'object' && !Buffer.isBuffer(body) ? 'application/json; charset=utf-8' : 'text/plain', ...headers }); res.end(b); };
   async function readBody(req) { const ch = []; let n = 0; for await (const c of req) { n += c.length; if (n > 8e6) throw new D.HttpError(413, 'Permintaan terlalu besar'); ch.push(c); } const s = Buffer.concat(ch).toString(); return s ? JSON.parse(s) : {}; }
@@ -33,12 +34,12 @@ async function start({ port = +process.env.PORT || 3000, dataDir = DATA, seed = 
         for (const r of routes) {
           if (r.method !== req.method) continue; const m = r.re.exec(p); if (!m) continue;
           const ctx = r.public ? {} : await buildCtx(req); ctx.ip = ip; ctx.params = m.groups || {}; ctx.query = u.query; ctx.body = req.method === 'GET' || req.method === 'DELETE' ? {} : await readBody(req);
-          return send(res, 200, (await r.fn(ctx)) ?? { ok: true });
+          const out = (await r.fn(ctx)) ?? { ok: true }; return send(res, 200, r.public ? out : signDeep(out));
         }
         return send(res, 404, { error: 'Endpoint tidak ditemukan' });
       }
       const mq = /^\/qr\/(.+)\.svg$/.exec(p); if (mq) { const base = `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}`; const t = decodeURIComponent(mq[1]); return send(res, 200, qr.svg(t.startsWith('LP-PKG') || t.startsWith('LP-BATCH') || t.startsWith('LP-QR') ? `${base}/t/${t}` : t), { 'content-type': 'image/svg+xml', 'cache-control': 'public,max-age=3600' }); }
-      if (p.startsWith('/uploads/')) { const f = path.join(DATA, 'uploads', path.basename(p)); if (fs.existsSync(f)) return send(res, 200, fs.readFileSync(f), { 'content-type': MIME[path.extname(f)] || 'application/octet-stream' }); return send(res, 404, 'Tidak ada'); }
+      if (p.startsWith('/uploads/')) { if (!auth.verifyUrl(p, u.query.e, u.query.s)) return send(res, 403, { error: 'Tautan bukti tidak valid atau kedaluwarsa' }); const f = path.join(DATA, 'uploads', path.basename(p)); if (fs.existsSync(f)) return send(res, 200, fs.readFileSync(f), { 'content-type': MIME[path.extname(f)] || 'application/octet-stream' }); return send(res, 404, 'Tidak ada'); }
       if (p.startsWith('/t/')) return send(res, 200, fs.readFileSync(path.join(PUB, 'trace.html')), { 'content-type': MIME['.html'] });
       let f = path.join(PUB, p === '/' ? 'index.html' : p); if (!f.startsWith(PUB)) return send(res, 403, 'Dilarang');
       if (!fs.existsSync(f) || fs.statSync(f).isDirectory()) f = path.join(PUB, 'index.html');

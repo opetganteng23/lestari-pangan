@@ -1,6 +1,6 @@
 // Logika domain LestariPangan: setoran, verifikasi, batch/lineage, transfer, anchor, jejak publik.
 const crypto = require('crypto');
-const ledger = require('./ledger');
+const ledger = require('./ledger/index');
 const { sha256, hashPassword, checkPassword } = require('./auth');
 const { uid } = require('./store');
 
@@ -12,9 +12,9 @@ const round = (n, d = 1) => Math.round(n * 10 ** d) / 10 ** d;
 
 module.exports = function createDomain(store) {
   const C = (n) => store.col(n);
-  const col = Object.fromEntries(['users', 'actors', 'referralCodes', 'farmerGroups', 'qrLabels', 'deposits', 'batches', 'transfers', 'events', 'outbox', 'anomalies', 'notifications', 'auditLogs', 'appConfig', 'counters', 'analyticsReports'].map((n) => [n, C(n)]));
+  const col = Object.fromEntries(['users', 'actors', 'referralCodes', 'farmerGroups', 'qrLabels', 'deposits', 'batches', 'transfers', 'events', 'outbox', 'anomalies', 'notifications', 'auditLogs', 'appConfig', 'counters', 'analyticsReports', 'scans'].map((n) => [n, C(n)]));
 
-  const DEFAULT_CFG = { _id: 'cfg', tolerancePct: 2, depositSlaHours: 24, samplingRate: 30, qrQuotaPerPeriod: 200, yieldAlertPct: 55, hangingHours: 48, notifierMode: 'manual' };
+  const DEFAULT_CFG = { _id: 'cfg', tolerancePct: 2, depositSlaHours: 24, samplingRate: 30, qrQuotaPerPeriod: 200, yieldAlertPct: 55, hangingHours: 48, scanAlertPerDay: 100, notifierMode: 'manual' };
   async function cfg() { let c = await col.appConfig.findOne({ _id: 'cfg' }); if (!c) c = await col.appConfig.insert({ ...DEFAULT_CFG }); return c; }
   async function seq(name) { let c = await col.counters.findOne({ _id: name }); if (!c) await col.counters.insert({ _id: name, n: 0 }); const n = (c ? c.n : 0) + 1; await col.counters.update({ _id: name }, { n }); return n; }
   const pad = (n, w = 6) => String(n).padStart(w, '0');
@@ -64,7 +64,7 @@ module.exports = function createDomain(store) {
       if (!onchain) bad.push({ eventId: e._id, reason: 'tidak ada di ledger' });
       else if (onchain.hash !== recomputed) bad.push({ eventId: e._id, batchCode: e.batchCode, type: e.type, reason: 'hash data tidak cocok dengan ledger' });
     }
-    const chain = ledger.verifyChain();
+    const chain = await ledger.verifyChain();
     return { network: ledger.network, checked: events.length, mismatches: bad, chain, ok: bad.length === 0 && chain.ok };
   }
 
@@ -307,13 +307,13 @@ module.exports = function createDomain(store) {
       else if (e.type === 'STORED') detail = `${e.actorName} · ${p.location}`;
       else if (e.type === 'DEPOSIT_REJECTED') { title = 'Setoran ditolak admin'; detail = p.reason; }
       else detail = e.actorName;
-      steps.push({ at: e.at, title, detail, place, type: e.type, anchored: e.anchorStatus === 'confirmed', onBehalf: e.origin === 'superadmin' ? `dicatat administrator atas nama ${actors[e.onBehalfOfActorId]?.name || 'pelaku'}` : null });
+      steps.push({ resolved: !!p.resolved, at: e.at, title, detail, place, type: e.type, anchored: e.anchorStatus === 'confirmed', onBehalf: e.origin === 'superadmin' ? `dicatat administrator atas nama ${actors[e.onBehalfOfActorId]?.name || 'pelaku'}` : null });
     }
     const gaps = []; if (hasProc && !hasStored) { const g = { title: 'Penyimpanan gudang belum tercatat', detail: 'Tahap ini tidak ada datanya; celah ditampilkan, tidak disambung otomatis.' }; gaps.push(g); const i = steps.findIndex((x) => x.type === 'PROCESSED'); steps.splice(i < 0 ? steps.length : i, 0, { ...g, gap: true, at: steps[Math.max(0, i - 1)]?.at }); }
     const anchored = await col.events.find({ batchId: { $in: ids }, anchorStatus: 'confirmed' }); let ok = 0;
     for (const e of anchored) { const l = await ledger.lookup(e._id); if (l && l.hash === eventHash(e)) ok++; }
     const holder = actors[b.ownerActorId]; const top = (await col.events.find({ batchId: b._id, anchorStatus: 'confirmed' }, { sort: { at: -1 }, limit: 1 }))[0];
-    return { product: b.meta?.product || (b.commodity === 'beras' ? 'Beras' : 'Gabah'), lot: b.meta?.lot || b.code, batchCode: b.code, kind: b.kind, packedAt: b.meta?.packedAt, packKg: b.meta?.packKg, qty: b.meta?.qty, holder: holder ? { name: holder.name, role: holder.role, district: holder.district } : null, status: b.status, tainted: b.tainted, composition: comp.map((c) => ({ name: c.name, district: c.district, pct: c.pct, lat: +c.lat.toFixed(2), lng: +c.lng.toFixed(2), verifiedPct: round(c.verified / c.share * 100, 0), autoPct: round(c.auto / c.share * 100, 0) })), steps, gaps, integrity: { network: ledger.network, events: anchored.length, verified: ok, chainOk: ledger.verifyChain().ok, lastTx: top?.anchor?.txId, lastBlock: top?.anchor?.block } };
+    return { product: b.meta?.product || (b.commodity === 'beras' ? 'Beras' : 'Gabah'), lot: b.meta?.lot || b.code, batchCode: b.code, kind: b.kind, packedAt: b.meta?.packedAt, packKg: b.meta?.packKg, qty: b.meta?.qty, holder: holder ? { name: holder.name, role: holder.role, district: holder.district } : null, status: b.status, tainted: b.tainted, composition: comp.map((c) => ({ name: c.name, district: c.district, pct: c.pct, lat: +c.lat.toFixed(2), lng: +c.lng.toFixed(2), verifiedPct: round(c.verified / c.share * 100, 0), autoPct: round(c.auto / c.share * 100, 0) })), steps, gaps, integrity: { network: ledger.network, events: anchored.length, verified: ok, chainOk: (await ledger.verifyChain()).ok, lastTx: top?.anchor?.txId, lastBlock: top?.anchor?.block } };
   }
 
   // ---------- batch detail ----------

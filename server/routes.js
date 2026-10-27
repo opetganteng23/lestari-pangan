@@ -21,7 +21,8 @@ module.exports = function build(D, A) {
   }
 
   // ----- publik -----
-  add('GET', '/api/public/trace/:code', async (c) => D.trace(decodeURIComponent(c.params.code)), { public: true });
+  add('GET', '/api/public/trace/:code', async (c) => { const code = decodeURIComponent(c.params.code); const r = await D.prov.passport(code); D.prov.recordScan(code, c.ip).catch(() => {}); return r; }, { public: true });
+  add('GET', '/api/products/:code/passport', async (c) => { const code = decodeURIComponent(c.params.code); const r = await D.prov.passport(code); D.prov.recordScan(code, c.ip).catch(() => {}); return r; }, { public: true });
   const loginLimiter = sec.createLimiter({ max: +process.env.LOGIN_MAX_FAILS || 5, windowMs: (+process.env.LOGIN_LOCK_MIN || 15) * 60000 });
   add('POST', '/api/login', async (c) => {
     const email = String(c.body.email || '').toLowerCase().trim(); const key = (c.ip || '?') + '|' + email;
@@ -103,6 +104,8 @@ module.exports = function build(D, A) {
     const as = await names(); const gs = await col.farmerGroups.find({}); return (await col.batches.find(f, { sort: { createdAt: -1 } })).map((b) => ({ ...b, ownerName: as[b.ownerActorId]?.name, groupName: gs.find((g) => g._id === b.farmerGroupId)?.name }));
   });
   add('GET', '/api/batches/:id', async (c) => { need(c, [...ACTOR_ROLES, 'admin', 'pengawas']); const d = await D.batchDetail(c, c.params.id); d.owner = (await names())[d.batch.ownerActorId]?.name; return d; });
+  add('GET', '/api/batches/:id/lineage', async (c) => { need(c, [...ACTOR_ROLES, 'admin', 'pengawas']); const r = await D.prov.lineage(c.params.id); r.scans = await D.prov.scanStats(c.params.id); return r; });
+  add('GET', '/api/batches/:id/integrity', async (c) => { need(c, [...ACTOR_ROLES, 'admin', 'pengawas']); return D.prov.verifyBatch(c.params.id); });
   add('POST', '/api/batches/merge', async (c) => { need(c, ['pengepul'], true); return D.mergeBatches(c, c.body.ids); });
   add('POST', '/api/batches/:id/store', async (c) => { need(c, ['gudang'], true); return D.storeBatch(c, c.params.id, c.body); });
   add('POST', '/api/batches/:id/process', async (c) => { need(c, ['gudang'], true); return D.processBatch(c, c.params.id, c.body); });
@@ -132,7 +135,7 @@ module.exports = function build(D, A) {
   add('GET', '/api/audit', async (c) => { need(c, ['admin', 'pengawas']); const lim = Math.min(500, Math.max(1, +c.query.limit || 200)), off = Math.max(0, +c.query.offset || 0); const all = await col.auditLogs.find({}, { sort: { at: -1 }, limit: off + lim }); return all.slice(off); });
   add('GET', '/api/events', async (c) => { need(c, ['admin', 'pengawas']); const f = c.query.batchId ? { batchId: c.query.batchId } : {}; return (await col.events.find(f, { sort: { at: -1 }, limit: 100 })); });
   add('GET', '/api/config', async (c) => { need(c, ['admin', 'pengawas']); return D.cfg(); });
-  add('PUT', '/api/config', async (c) => { need(c, ['admin'], true); const p = {}; for (const k of ['tolerancePct', 'depositSlaHours', 'samplingRate', 'qrQuotaPerPeriod', 'yieldAlertPct', 'hangingHours']) if (k in c.body) { const v = +c.body[k]; if (!(v >= 0)) throw bad(`${k} tidak valid`); p[k] = v; } if (['manual', 'smtp'].includes(c.body.notifierMode)) p.notifierMode = c.body.notifierMode; await D.cfg(); await col.appConfig.update({ _id: 'cfg' }, p); await D.audit(c, 'konfigurasi.ubah', JSON.stringify(p)); return D.cfg(); });
+  add('PUT', '/api/config', async (c) => { need(c, ['admin'], true); const p = {}; for (const k of ['tolerancePct', 'depositSlaHours', 'samplingRate', 'qrQuotaPerPeriod', 'yieldAlertPct', 'hangingHours', 'scanAlertPerDay']) if (k in c.body) { const v = +c.body[k]; if (!(v >= 0)) throw bad(`${k} tidak valid`); p[k] = v; } if (['manual', 'smtp'].includes(c.body.notifierMode)) p.notifierMode = c.body.notifierMode; await D.cfg(); await col.appConfig.update({ _id: 'cfg' }, p); await D.audit(c, 'konfigurasi.ubah', JSON.stringify(p)); return D.cfg(); });
   add('GET', '/api/notifications', async (c) => { const f = []; const all = await col.notifications.find({}, { sort: { at: -1 }, limit: 200 }); return all.filter((n) => (n.toActorId && n.toActorId === c.actor?._id) || (n.toRole && (n.toRole === c.role || (c.role === 'superadmin' && n.toRole === 'admin')))).slice(0, 30); });
   add('POST', '/api/notifications/read', async (c) => { for (const n of await col.notifications.find({ read: false })) if ((n.toActorId && n.toActorId === c.actor?._id) || (n.toRole && n.toRole === c.role)) await col.notifications.update({ _id: n._id }, { read: true }); return { ok: true }; });
 

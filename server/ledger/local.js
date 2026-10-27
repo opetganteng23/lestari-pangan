@@ -2,7 +2,7 @@
 // Implementasi bawaan: SIMULASI hash-chain lokal (append-only, tiap blok menautkan hash blok sebelumnya).
 // Untuk produksi/uji: ganti dengan adapter EVM testnet (ethers.js) yang memanggil kontrak LPAnchor dengan antarmuka sama.
 const fs = require('fs'), path = require('path'), crypto = require('crypto');
-const FILE = path.join(require('./paths').DATA, 'ledger.json'); fs.mkdirSync(path.dirname(FILE), { recursive: true });
+const FILE = path.join(require('../paths').DATA, 'ledger.json'); fs.mkdirSync(path.dirname(FILE), { recursive: true });
 const NETWORK = process.env.LEDGER_NETWORK || 'Ledger simulasi lokal (hash-chain)';
 const h = (s) => crypto.createHash('sha256').update(s).digest('hex');
 let blocks = fs.existsSync(FILE) ? JSON.parse(fs.readFileSync(FILE, 'utf8')) : [];
