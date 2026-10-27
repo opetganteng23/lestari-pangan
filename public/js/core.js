@@ -8,14 +8,14 @@ const sd = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStora
 const ss = { get: (k) => { try { return JSON.parse(sessionStorage.getItem(k)); } catch { return null; } }, set: (k, v) => { try { v == null ? sessionStorage.removeItem(k) : sessionStorage.setItem(k, JSON.stringify(v)); } catch {} } };
 const S = {}; let me = null; let curRoute = '';
 
-async function api(path, { method = 'GET', body, raw } = {}) {
-  const h = { 'content-type': 'application/json' }; const tok = ld('lp_token');
+async function api(path, { method = 'GET', body, raw, headers, noLogout } = {}) {
+  const h = { 'content-type': 'application/json', ...(headers || {}) }; const tok = ld('lp_token');
   if (tok) h.authorization = 'Bearer ' + tok;
   const act = ss.get('lp_act'), view = ss.get('lp_view');
   if (act) h['x-act-token'] = act.token; else if (view) h['x-view-as'] = view.actorId;
   const r = await fetch(path, { method, headers: h, body: body ? JSON.stringify(body) : undefined });
   const j = await r.json().catch(() => ({}));
-  if (r.status === 401 && tok && !raw) { logout(); throw new Error(j.error || 'Sesi berakhir'); }
+  if (r.status === 401 && tok && !raw && !noLogout) { logout(); throw new Error(j.error || 'Sesi berakhir'); }
   if (!r.ok) throw new Error(j.error || 'Terjadi kesalahan');
   return j;
 }
@@ -25,7 +25,7 @@ const guard = (fn) => async (...a) => { try { return await fn(...a); } catch (e)
 const CH = { pending_verification: ['wait', 'Menunggu verifikasi'], available: ['ok', 'Tersedia'], in_transit: ['info', 'Dalam pengiriman'], merged: ['gray', 'Digabung'], processed: ['gray', 'Sudah diolah'], consumed: ['gray', 'Habis'], voided: ['bad', 'Dibatalkan'], disputed: ['bad', 'Sengketa'], pending: ['wait', 'Menunggu verifikasi'], verified: ['ok', 'Terverifikasi'], auto_accepted: ['info', 'Diterima otomatis'], rejected: ['bad', 'Ditolak'], received: ['ok', 'Diterima'], resolved_accepted: ['ok', 'Diterima (putusan admin)'], returned: ['gray', 'Dikembalikan'], tinggi: ['bad', 'Tinggi'], sedang: ['wait', 'Sedang'], rendah: ['gray', 'Rendah'] };
 const chip = (s, label) => { const c = CH[s] || ['gray', s]; return `<span class="chip ${c[0]}">${esc(label || c[1])}</span>`; };
 const KIND = { deposit: 'Setoran', merged: 'Gabungan', processed: 'Hasil giling', packaged: 'Kemasan' };
-const ROLE = { superadmin: 'Super admin', admin: 'Admin teknis', pengawas: 'Pengawas', pengepul: 'Pengepul', gudang: 'Gudang/penggilingan', distributor: 'Distributor', logistik: 'Logistik', retailer: 'Retailer' };
+const ROLE = { kelompok_tani: 'Kelompok tani', superadmin: 'Super admin', admin: 'Admin teknis', pengawas: 'Pengawas', pengepul: 'Pengepul', gudang: 'Gudang/penggilingan', distributor: 'Distributor', logistik: 'Logistik', retailer: 'Retailer' };
 
 function openModal({ title, body, submit = 'Simpan', onSubmit, cancel = 'Batal', hideSubmit }) {
   const bg = document.createElement('div'); bg.className = 'modal-bg';
@@ -51,27 +51,29 @@ const NAV = {
   superadmin: [['mode-tindak', 'Mode Tindak'], ['mode-lihat', 'Mode Lihat'], ['dashboard', 'Dashboard Pengawasan'], ['verifikasi', 'Antrean Verifikasi', 'pending'], ['pengguna', 'Pengguna'], ['pelaku', 'Pelaku & Kode Referral'], ['kelompok', 'Kelompok Tani'], ['sengketa', 'Sengketa Transfer', 'disputed'], ['tracelog', 'Trace Log'], ['anomali', 'Anomali'], ['tren', 'Tren Pasokan'], ['integritas', 'Integritas Blockchain'], ['konfigurasi', 'Konfigurasi'], ['audit', 'Audit Log']],
 };
 
+NAV.kelompok_tani = [['portal', 'Beranda Kelompok'], ['laporan', 'Laporan']];
 const ADD = {
-  admin: [['kasus', 'Kasus & Investigasi'], ['risiko', 'Papan Risiko'], ['neraca', 'Neraca Massa'], ['laporan', 'Laporan & Ekspor'], ['email', 'Pengiriman Email'], ['copilot', 'Asisten Analisis']],
+  admin: [['integrasi', 'Integrasi & API'], ['kasus', 'Kasus & Investigasi'], ['risiko', 'Papan Risiko'], ['neraca', 'Neraca Massa'], ['laporan', 'Laporan & Ekspor'], ['email', 'Pengiriman Email'], ['copilot', 'Asisten Analisis']],
   pengawas: [['kasus', 'Kasus & Investigasi'], ['risiko', 'Papan Risiko'], ['neraca', 'Neraca Massa'], ['laporan', 'Laporan & Ekspor'], ['copilot', 'Asisten Analisis']],
-  superadmin: [['kasus', 'Kasus & Investigasi'], ['risiko', 'Papan Risiko'], ['neraca', 'Neraca Massa'], ['laporan', 'Laporan & Ekspor'], ['email', 'Pengiriman Email'], ['copilot', 'Asisten Analisis']],
+  superadmin: [['integrasi', 'Integrasi & API'], ['kasus', 'Kasus & Investigasi'], ['risiko', 'Papan Risiko'], ['neraca', 'Neraca Massa'], ['laporan', 'Laporan & Ekspor'], ['email', 'Pengiriman Email'], ['copilot', 'Asisten Analisis']],
   gudang: [['neraca', 'Neraca Massa'], ['laporan', 'Laporan']],
 };
 for (const [k, v] of Object.entries(ADD)) NAV[k].push(...v);
 for (const k of Object.keys(NAV)) NAV[k].push(['profil', 'Profil & Keamanan']);
 
 // ---------- sesi ----------
-function logout(done) { if (!done && ld('lp_token')) { fetch('/api/logout', { method: 'POST', headers: { authorization: 'Bearer ' + ld('lp_token'), 'content-type': 'application/json' }, body: '{}' }).catch(() => {}); } sd('lp_token', null); ss.set('lp_act', null); ss.set('lp_view', null); me = null; location.hash = ''; renderLogin(); }
-async function loadMe() { me = await api('/api/me'); return me; }
+function logout(done) { sd('lp_me', null); if (!done && ld('lp_token')) { fetch('/api/logout', { method: 'POST', headers: { authorization: 'Bearer ' + ld('lp_token'), 'content-type': 'application/json' }, body: '{}' }).catch(() => {}); } sd('lp_token', null); ss.set('lp_act', null); ss.set('lp_view', null); me = null; location.hash = ''; renderLogin(); }
+async function loadMe() { me = await api('/api/me'); sd('lp_me', me); return me; }
 async function boot() {
   const m = location.hash.match(/^#\/t\/(.+)/); if (m) { location.href = '/t/' + m[1]; return; }
   if (!ld('lp_token')) return renderLogin();
-  try { await loadMe(); renderApp(); } catch { renderLogin(); }
+  try { await loadMe(); renderApp(); if (window.OFF) OFF.sync(); }
+  catch (e) { const cached = ld('lp_me'); if (e instanceof TypeError && cached) { me = cached; renderApp(); toast('Mode offline: beberapa data mungkin tidak terbaru', true); } else renderLogin(); }
 }
 function leaveMode() { ss.set('lp_act', null); ss.set('lp_view', null); location.hash = '#/'; location.reload(); }
 
 function renderLogin() {
-  const accs = [['sa@lestari.id', 'Super Admin', 'Semua fitur semua peran'], ['admin@lestari.id', 'Admin Teknis', 'Verifikasi, referral, sengketa'], ['pengawas@lestari.id', 'Pengawas (Dinas)', 'Dashboard dan analitik, baca-saja'], ['pengepul1@lestari.id', 'Pengepul · CV Tani Makmur', 'Catat setoran, QR hulu'], ['gudang1@lestari.id', 'Penggilingan Sinar Jaya', 'Terima, giling, kemas'], ['distributor@lestari.id', 'Distributor', 'Teruskan ke retailer'], ['logistik@lestari.id', 'Logistik', 'Pengangkut'], ['retailer@lestari.id', 'Retailer', 'Terima dan jual']];
+  const accs = [['sa@lestari.id', 'Super Admin', 'Semua fitur semua peran'], ['admin@lestari.id', 'Admin Teknis', 'Verifikasi, referral, sengketa'], ['pengawas@lestari.id', 'Pengawas (Dinas)', 'Dashboard dan analitik, baca-saja'], ['pengepul1@lestari.id', 'Pengepul · CV Tani Makmur', 'Catat setoran, QR hulu'], ['gudang1@lestari.id', 'Penggilingan Sinar Jaya', 'Terima, giling, kemas'], ['distributor@lestari.id', 'Distributor', 'Teruskan ke retailer'], ['logistik@lestari.id', 'Logistik', 'Pengangkut'], ['retailer@lestari.id', 'Retailer', 'Terima dan jual'], ['kelompok.sumber@lestari.id', 'Ketua KT Sumber Rejeki', 'Portal kelompok tani']];
   $('#root').innerHTML = `<div class="login"><div class="box"><div class="l"><div class="brand" style="padding:0 0 18px"><img src="/assets/img/emblem.png" alt=""><div><b>Lestari<span>Pangan</span></b><small>Traceability pangan dari sawah sampai meja makan</small></div></div>
   <h2 style="font-size:20px;color:var(--g900);margin-bottom:4px">Masuk</h2><p class="small">Prototipe · semua data adalah <b>simulasi</b></p>
   <form id="lf"><label class="f">Email</label><input class="inp" name="email" type="email" required autocomplete="username" value=""><label class="f">Kata sandi</label><input class="inp" name="password" type="password" required autocomplete="current-password"><div class="btns" style="margin-top:16px"><button class="btn pri" style="flex:1">Masuk</button></div></form>

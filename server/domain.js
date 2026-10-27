@@ -107,6 +107,13 @@ module.exports = function createDomain(store) {
   }
 
   // ---------- setoran ----------
+  // Pembacaan timbangan perangkat: harus milik pelaku, belum dipakai, <48 jam, dan beratnya cocok (toleransi 0,5%)
+  async function claimReading(actor, id, kg) {
+    const r = await col.deviceReadings.findOne({ _id: id }); if (!r || r.actorId !== actor._id) throw bad('Pembacaan timbangan tidak ditemukan');
+    if (r.used) throw conflict('Pembacaan timbangan sudah dipakai'); if (Date.now() - new Date(r.at) > 48 * 3600e3) throw bad('Pembacaan timbangan kedaluwarsa (lebih dari 48 jam)');
+    if (Math.abs(r.weightKg - kg) / r.weightKg > 0.005) throw bad(`Berat ${kg} kg tidak cocok dengan pembacaan perangkat ${r.weightKg} kg`);
+    await col.deviceReadings.update({ _id: id }, { used: true, usedAt: now() }); return 'device';
+  }
   async function createDeposit(ctx, d) {
     const a = ctx.actor; if (!a || a.role !== 'pengepul') throw forbid('Hanya pengepul yang mencatat setoran');
     const group = await col.farmerGroups.findOne({ _id: d.farmerGroupId });
@@ -114,6 +121,7 @@ module.exports = function createDomain(store) {
     if (!(group.linkedActorIds || []).includes(a._id)) throw forbid('Kelompok tani ini belum terhubung dengan pengepul Anda');
     if (!codeOk(group, d.groupCode)) { await anomaly('kode_ketua_salah', 'sedang', `Kode ketua salah untuk ${group.name}`, { actorId: a._id }); throw forbid('Kode ketua tidak valid'); }
     const kg = +d.weightKg; if (!(kg > 0)) throw bad('Berat harus lebih dari 0');
+    const weightSource = d.deviceReadingId ? await claimReading(a, d.deviceReadingId, kg) : 'manual';
     const nota = String(d.notaNo || '').trim().toUpperCase(); if (!nota) throw bad('Nomor nota wajib');
     if (await col.deposits.findOne({ notaNo: nota, status: { $ne: 'rejected' } })) { await anomaly('nota_ganda', 'sedang', `Nomor nota ganda ditolak (${nota})`, { actorId: a._id }); throw conflict('Nomor nota sudah dipakai'); }
     if (!d.notaPhoto || !d.scalePhoto) throw bad('Foto timbangan dan foto nota bertanda tangan wajib');
@@ -131,7 +139,7 @@ module.exports = function createDomain(store) {
     const seqN = await seq('batch');
     const batch = await col.batches.insert({ code: `LP-BATCH-2026-${pad(seqN)}`, kind: 'deposit', commodity: d.commodity || 'gabah', weightKg: kg, ownerActorId: a._id, status: 'pending_verification', parents: [], farmerGroupId: group._id, qrCode: label.code, tainted: false, createdAt: d.at || now() });
     await col.qrLabels.update({ _id: label._id }, { status: 'assigned', batchId: batch._id });
-    const dep = await col.deposits.insert({ batchId: batch._id, actorId: a._id, farmerGroupId: group._id, weightKg: kg, notaNo: nota, notaPhoto: d.notaPhoto, scalePhoto: d.scalePhoto, note: d.note || '', status: 'pending', checkMode: mode, checkReason: reasons.join(', ') || (sampled ? 'sampling' : 'rutin'), createdAt: d.at || now(), createdByUser: ctx.user._id });
+    const dep = await col.deposits.insert({ weightSource, capturedAt: d.capturedAt || null, batchId: batch._id, actorId: a._id, farmerGroupId: group._id, weightKg: kg, notaNo: nota, notaPhoto: d.notaPhoto, scalePhoto: d.scalePhoto, note: d.note || '', status: 'pending', checkMode: mode, checkReason: reasons.join(', ') || (sampled ? 'sampling' : 'rutin'), createdAt: d.at || now(), createdByUser: ctx.user._id });
     const ev = await emit(ctx, { type: 'DEPOSIT_RECORDED', batch, actor: a, payload: { depositId: dep._id, farmerGroupId: group._id, weightKg: kg, notaNo: nota, qrCode: label.code }, anchor: false, at: d.at });
     await col.deposits.update({ _id: dep._id }, { recordedEventId: ev._id });
     if (auto) await decideDeposit({ ...ctx, role: 'system', user: ctx.user }, dep._id, 'auto_accept', {}, true);
@@ -154,6 +162,7 @@ module.exports = function createDomain(store) {
       await emit(ctx, { type: 'DEPOSIT_REJECTED', batch, actor: adminActor, payload: { depositId: dep._id, reason: d.reason }, anchor: true });
       await audit(ctx, 'setoran.tolak', `${batch.code}: ${d.reason}`);
       await notify({ toActorId: dep.actorId, text: `Setoran ${batch.code} ditolak: ${d.reason}`, link: '#/setoran' });
+      await notify({ toGroupId: dep.farmerGroupId, text: `Setoran ${dep.weightKg} kg (nota ${dep.notaNo}) ditolak: ${d.reason}`, link: '#/portal' });
       return col.deposits.findOne({ _id: dep._id });
     }
     const status = system ? 'auto_accepted' : 'verified';
@@ -162,6 +171,7 @@ module.exports = function createDomain(store) {
     await emit(ctx, { type: status === 'verified' ? 'DEPOSIT_VERIFIED' : 'DEPOSIT_AUTO_ACCEPTED', batch, actor: adminActor, payload: { depositId: dep._id, recordedEventId: dep.recordedEventId, weightKg: dep.weightKg, checkMode: dep.checkMode, farmerGroupId: dep.farmerGroupId, pengepulId: dep.actorId }, anchor: true });
     if (!system) await audit(ctx, 'setoran.setujui', batch.code);
     await notify({ toActorId: dep.actorId, text: `Setoran ${batch.code} ${status === 'verified' ? 'disetujui' : 'diterima otomatis'}`, link: '#/batch' });
+    await notify({ toGroupId: dep.farmerGroupId, text: `Setoran ${dep.weightKg} kg (nota ${dep.notaNo}) ${status === 'verified' ? 'diverifikasi admin' : 'diterima otomatis'}`, link: '#/portal' });
     return col.deposits.findOne({ _id: dep._id });
   }
   async function taintDescendants(rootId) {
@@ -287,7 +297,7 @@ module.exports = function createDomain(store) {
     const out = +d.outputKg; if (!(out > 0) || out > b.weightKg) throw bad('Berat beras tidak valid'); const yieldPct = round(out / b.weightKg * 100);
     const s = await seq('batch'); const c = await cfg();
     const mb = massBalance(b.weightKg, out, d.byproductKg, d.shrinkKg, c.massBalanceTolerancePct); if (mb.error) throw bad(mb.error);
-    const weightSource = d.weightSource === 'device' ? 'device' : 'manual';
+    const weightSource = d.deviceReadingId ? await claimReading(a, d.deviceReadingId, out) : 'manual';
     const nb = await col.batches.insert({ code: `LP-BATCH-2026-${pad(s)}`, kind: 'processed', commodity: 'beras', weightKg: out, ownerActorId: a._id, status: 'available', parents: [{ batchId: b._id, weightKg: b.weightKg }], tainted: b.tainted, createdAt: now(), meta: { yieldPct, variety: d.variety || 'Pulen', selfReported: true, weightSource, mb } });
     await col.batches.update({ _id: b._id }, { status: 'processed' });
     await emit(ctx, { type: 'PROCESSED', batch: nb, actor: a, payload: { inputKg: b.weightKg, outputKg: out, yieldPct, selfReported: true, fromBatch: b.code, byproductKg: mb.byproductKg, shrinkKg: mb.shrinkKg, unexplainedKg: mb.unexplainedKg, balance: mb.status, weightSource } });
@@ -343,5 +353,5 @@ module.exports = function createDomain(store) {
     return { batch: b, composition: await composition(b), parents: anc.filter((x) => x._id !== b._id).map((x) => ({ _id: x._id, code: x.code, kind: x.kind, weightKg: x.weightKg, status: x.status })), events, hasStored: events.some((e) => e.type === 'STORED' && e.batchId === b._id) };
   }
   const _ = { checkPassword, hashPassword };
-  return { hooks, holdCheck, massBalance, col, cfg, seq, audit, notify, emit, processOutbox, integrity, anomaly, createGroup, rotateGroupCode, publicGroup, pengepulGroups, issueLabels, createDeposit, decideDeposit, mergeBatches, sendTransfer, confirmTransfer, resolveDispute, carrierStep, storeBatch, processBatch, packBatch, trace, batchDetail, composition, ancestors, batchById, eventHash, HttpError, bad, forbid, notFound, conflict, round, now, _ };
+  return { claimReading, hooks, holdCheck, massBalance, col, cfg, seq, audit, notify, emit, processOutbox, integrity, anomaly, createGroup, rotateGroupCode, publicGroup, pengepulGroups, issueLabels, createDeposit, decideDeposit, mergeBatches, sendTransfer, confirmTransfer, resolveDispute, carrierStep, storeBatch, processBatch, packBatch, trace, batchDetail, composition, ancestors, batchById, eventHash, HttpError, bad, forbid, notFound, conflict, round, now, _ };
 };

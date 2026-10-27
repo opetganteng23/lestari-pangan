@@ -98,24 +98,24 @@ S['mode-lihat'] = async (m) => {
 };
 
 // ---------- Pengguna (CRUD, admin) ----------
-const USER_ROLE_LIST = ['pengepul', 'gudang', 'distributor', 'logistik', 'retailer', 'pengawas', 'admin'];
+const USER_ROLE_LIST = ['pengepul', 'gudang', 'distributor', 'logistik', 'retailer', 'kelompok_tani', 'pengawas', 'admin'];
 const roleOpts = (list, sel) => list.map((r) => `<option value="${r}" ${sel === r ? 'selected' : ''}>${ROLE[r]}</option>`).join('');
 
 S.pengguna = async (m) => {
   const us = await api('/api/users'); const f = ss.get('lp_uf') || { q: '', role: '' };
   const rows = us.filter((u) => (!f.role || u.role === f.role) && (!f.q || (u.name + u.email).toLowerCase().includes(f.q.toLowerCase())));
   const tbl = rows.length
-    ? `<div class="tw"><table><tr><th>Nama</th><th>Email</th><th>Peran</th><th>Wilayah</th><th>Status</th><th></th></tr>${rows.map((u) => `<tr><td><b>${esc(u.name)}</b></td><td>${esc(u.email)}</td><td>${ROLE[u.role]}</td><td>${esc(u.district || '-')}</td><td>${u.active ? chip('verified', 'Aktif') : chip('voided', 'Nonaktif')}</td><td><div class="btns"><button class="btn sm" data-e="${u._id}">Ubah</button><button class="btn sm" data-p="${u._id}">Reset sandi</button><button class="btn sm" data-t="${u._id}" data-a="${u.active}">${u.active ? 'Nonaktifkan' : 'Aktifkan'}</button><button class="btn sm dan" data-d="${u._id}">Hapus</button></div></td></tr>`).join('')}</table></div>`
+    ? `<div class="tw"><table><tr><th>Nama</th><th>Email</th><th>Peran</th><th>Wilayah</th><th>Status</th><th></th></tr>${rows.map((u) => `<tr><td><b>${esc(u.name)}</b></td><td>${esc(u.email)}</td><td>${ROLE[u.role]}</td><td>${esc(u.groupName || u.district || '-')}</td><td>${u.active ? chip('verified', 'Aktif') : chip('voided', 'Nonaktif')}</td><td><div class="btns"><button class="btn sm" data-e="${u._id}">Ubah</button><button class="btn sm" data-p="${u._id}">Reset sandi</button><button class="btn sm" data-t="${u._id}" data-a="${u.active}">${u.active ? 'Nonaktifkan' : 'Aktifkan'}</button><button class="btn sm dan" data-d="${u._id}">Hapus</button></div></td></tr>`).join('')}</table></div>`
     : '<div class="empty">Tidak ada pengguna yang cocok</div>';
   m.innerHTML = `<div class="card"><div class="row" style="align-items:center"><h2 style="margin:0">Manajemen pengguna <span class="small">(${us.length} akun)</span></h2><div class="btns" style="flex:none"><button class="btn pri sm" id="nu">Tambah pengguna</button></div></div>
   <div class="row" style="margin:12px 0"><input class="inp" id="uq" placeholder="Cari nama atau email" value="${esc(f.q)}"><select class="inp" id="ur"><option value="">Semua peran</option>${roleOpts(USER_ROLE_LIST, f.role)}</select></div>${tbl}</div>`;
   const keep = () => { ss.set('lp_uf', { q: $('#uq').value, role: $('#ur').value }); reload(); };
   $('#ur').onchange = keep; $('#uq').onchange = keep;
-  $('#nu').onclick = () => openModal({
+  $('#nu').onclick = async () => { const gs = await api('/api/groups'); openModal({
     title: 'Tambah pengguna',
-    body: `${fld('role', 'Peran', { type: 'select', options: roleOpts(USER_ROLE_LIST) })}${fld('name', 'Nama / nama usaha')}${fld('email', 'Email', { type: 'email' })}${fld('district', 'Wilayah (untuk pelaku rantai pasok)', { required: false })}${fld('password', 'Kata sandi awal (min. 8 karakter)', { type: 'password' })}`,
+    body: `${fld('role', 'Peran', { type: 'select', options: roleOpts(USER_ROLE_LIST) })}${fld('name', 'Nama / nama usaha')}${fld('email', 'Email', { type: 'email' })}${fld('district', 'Wilayah (untuk pelaku rantai pasok)', { required: false })}${fld('groupId', 'Kelompok tani (hanya untuk peran Kelompok tani)', { type: 'select', required: false, options: opts(gs, '_id', 'name', '(tidak ada)') })}${fld('password', 'Kata sandi awal (min. 8 karakter, huruf dan angka)', { type: 'password' })}`,
     onSubmit: async (fd, c) => { await api('/api/users', { method: 'POST', body: fd }); c(); toast('Pengguna dibuat'); reload(); },
-  });
+  }); };
   const byId = (id) => us.find((x) => x._id === id);
   m.querySelectorAll('[data-e]').forEach((b) => (b.onclick = () => {
     const u = byId(b.dataset.e);

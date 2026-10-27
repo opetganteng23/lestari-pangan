@@ -17,6 +17,7 @@ async function start({ port = +process.env.PORT || 3000, dataDir = DATA, seed = 
     const user = await D.col.users.findOne({ _id: p.uid }); if (!user || !user.active) throw new D.HttpError(401, 'Akun tidak aktif');
     if ((p.sv || 0) !== (user.sv || 0)) throw new D.HttpError(401, 'Sesi sudah dicabut, silakan masuk lagi');
     const ctx = { user, role: user.role, actor: user.actorId ? await D.col.actors.findOne({ _id: user.actorId }) : null };
+    if (user.groupId) ctx.group = await D.col.farmerGroups.findOne({ _id: user.groupId });
     if (user.role === 'superadmin') {
       const at = h['x-act-token'] && auth.verify(h['x-act-token']); const view = h['x-view-as'];
       if (at && at.uid === user._id) { ctx.act = { ...at.act, exp: at.exp }; ctx.actor = await D.col.actors.findOne({ _id: at.act.actorId }); ctx.role = ctx.actor.role; }
@@ -33,8 +34,10 @@ async function start({ port = +process.env.PORT || 3000, dataDir = DATA, seed = 
         if (!apiLimiter.hit(ip)) return send(res, 429, { error: 'Terlalu banyak permintaan, coba lagi sebentar' }, { 'retry-after': String(apiLimiter.retryAfter(ip)) });
         for (const r of routes) {
           if (r.method !== req.method) continue; const m = r.re.exec(p); if (!m) continue;
-          const ctx = r.public ? {} : await buildCtx(req); ctx.ip = ip; ctx.params = m.groups || {}; ctx.query = u.query; ctx.body = req.method === 'GET' || req.method === 'DELETE' ? {} : await readBody(req);
-          const out = (await r.fn(ctx)) ?? { ok: true }; if (out && out.__csv) return send(res, 200, out.__csv.csv, { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="${out.__csv.filename}"` }); return send(res, 200, r.public ? out : signDeep(out));
+          const ctx = r.public ? {} : await buildCtx(req); ctx.ip = ip; ctx.headers = req.headers; ctx.params = m.groups || {}; ctx.query = u.query; ctx.body = req.method === 'GET' || req.method === 'DELETE' ? {} : await readBody(req);
+          const idemHdr = !r.public && req.method === 'POST' && ctx.user && String(req.headers['idempotency-key'] || '').slice(0, 100); const idemKey = idemHdr ? `${ctx.user._id}:${idemHdr}` : null; const bodyHash = idemKey ? require('crypto').createHash('sha256').update(JSON.stringify(ctx.body)).digest('hex') : null;
+          if (idemKey) { const hit = await D.col.idem.findOne({ key: idemKey }); if (hit) { if (hit.bodyHash !== bodyHash) throw new D.HttpError(409, 'Idempotency-Key sudah dipakai untuk permintaan berbeda'); return send(res, 200, signDeep(hit.response), { 'idempotent-replay': 'true' }); } }
+          const out = (await r.fn(ctx)) ?? { ok: true }; if (idemKey && !out.__csv) await D.col.idem.insert({ key: idemKey, bodyHash, response: out, at: new Date().toISOString() }); if (out && out.__csv) return send(res, 200, out.__csv.csv, { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="${out.__csv.filename}"` }); return send(res, 200, r.public ? out : signDeep(out));
         }
         return send(res, 404, { error: 'Endpoint tidak ditemukan' });
       }

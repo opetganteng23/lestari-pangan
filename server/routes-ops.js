@@ -22,9 +22,9 @@ module.exports = function ({ D, add, need, ACTOR_ROLES, bad, notFound }) {
   add('GET', '/api/massbalance/:batchId/corrections', async (c) => { need(c, [...STAFF, 'gudang']); return O.corrections(c.params.batchId); });
   add('POST', '/api/massbalance/:batchId/correction', async (c) => { need(c, ['admin', 'gudang'], true); return O.correctMassBalance(c, c.params.batchId, c.body); });
   // ekspor
-  add('GET', '/api/exports', async (c) => { need(c, [...STAFF, 'gudang']); const list = Object.entries(O.EXPORTS).filter(([, e]) => e.roles.includes(c.role) || c.role === 'superadmin').map(([k, e]) => ({ kind: k, title: e.title })); return { kinds: list, formats: ['csv'], note: 'CSV dibuka langsung di Excel. Untuk PDF gunakan tombol Cetak pada halaman laporan. XLSX/PDF asli belum tersedia.' }; });
+  add('GET', '/api/exports', async (c) => { need(c, [...STAFF, 'gudang', 'kelompok_tani']); const list = Object.entries(O.EXPORTS).filter(([, e]) => e.roles.includes(c.role) || c.role === 'superadmin').map(([k, e]) => ({ kind: k, title: e.title })); return { kinds: list, formats: ['csv'], note: 'CSV dibuka langsung di Excel. Untuk PDF gunakan tombol Cetak pada halaman laporan. XLSX/PDF asli belum tersedia.' }; });
   add('GET', '/api/exports/log', async (c) => { need(c, STAFF); return D.col.exportsLog.find({}, { sort: { at: -1 }, limit: 100 }); });
-  add('GET', '/api/exports/:kind', async (c) => { need(c, [...STAFF, 'gudang']); return { __csv: await O.exportCsv(c, c.params.kind, c.query) }; });
+  add('GET', '/api/exports/:kind', async (c) => { need(c, [...STAFF, 'gudang', 'kelompok_tani']); return { __csv: await O.exportCsv(c, c.params.kind, c.query) }; });
   // AI Copilot (baca-saja)
   add('POST', '/api/ai/copilot/query', async (c) => { need(c, STAFF); if (!aiLimiter.hit(c.user._id)) throw new D.HttpError(429, 'Terlalu banyak pertanyaan AI, coba lagi sebentar'); return D.copilot.query(c, c.body.question); });
   add('GET', '/api/ai/logs', async (c) => { need(c, ['admin']); return D.col.aiLogs.find({}, { sort: { at: -1 }, limit: 100 }); });

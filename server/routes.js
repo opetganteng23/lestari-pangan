@@ -52,10 +52,10 @@ module.exports = function build(D, A) {
     await D.notify({ toRole: 'admin', text: `Akun baru ${u.name} (${u.role}) mendaftar dengan kode ${code.code}. Hubungkan ke kelompok tani bila pengepul.` });
     return { ok: true };
   }, { public: true });
-  const pubUser = (u) => ({ _id: u._id, name: u.name, email: u.email, role: u.role, actorId: u.actorId });
+  const pubUser = (u) => ({ _id: u._id, name: u.name, email: u.email, role: u.role, actorId: u.actorId, groupId: u.groupId || null });
 
   // ----- sesi -----
-  add('GET', '/api/me', async (c) => ({ user: pubUser(c.user), role: c.role, actor: c.actor, act: c.act ? { role: c.act.role, actorId: c.act.actorId, reason: c.act.reason, exp: c.act.exp } : null, readOnly: !!c.readOnly, config: await D.cfg(), store: A.storeKind, network: require('./ledger').network, ai: process.env.ANTHROPIC_API_KEY ? 'claude' : 'rules' }));
+  add('GET', '/api/me', async (c) => ({ user: pubUser(c.user), role: c.role, actor: c.actor, group: c.group ? { _id: c.group._id, name: c.group.name, district: c.group.district } : null, act: c.act ? { role: c.act.role, actorId: c.act.actorId, reason: c.act.reason, exp: c.act.exp } : null, readOnly: !!c.readOnly, config: await D.cfg(), store: A.storeKind, network: require('./ledger').network, ai: process.env.ANTHROPIC_API_KEY ? 'claude' : 'rules' }));
   add('GET', '/api/actors', async (c) => { const f = c.query.role ? { role: c.query.role } : {}; return (await col.actors.find(f)).map((a) => ({ _id: a._id, name: a.name, role: a.role, district: a.district, lat: a.lat, lng: a.lng })); });
 
   // ----- super admin -----
@@ -84,7 +84,7 @@ module.exports = function build(D, A) {
   // ----- QR label & setoran -----
   add('GET', '/api/labels', async (c) => { need(c, ['pengepul']); const l = await col.qrLabels.find({ ownerActorId: c.actor._id }, { sort: { createdAt: -1 } }); const cf = await D.cfg(); return { labels: l, quota: cf.qrQuotaPerPeriod, used: l.filter((x) => x.period === D.now().slice(0, 7)).length }; });
   add('POST', '/api/labels', async (c) => { need(c, ['pengepul'], true); return D.issueLabels(c, c.body.n); });
-  add('POST', '/api/deposits', async (c) => { need(c, ['pengepul'], true); const b = { ...c.body }; b.notaPhoto = await savePhoto(b.notaPhoto); b.scalePhoto = await savePhoto(b.scalePhoto); return D.createDeposit(c, b); });
+  add('POST', '/api/deposits', async (c) => { need(c, ['pengepul'], true); const b = { ...c.body }; delete b.at; { const cap = Date.parse(b.capturedAt); b.capturedAt = cap && cap <= Date.now() + 60000 && cap >= Date.now() - 14 * 864e5 ? new Date(cap).toISOString() : null; } b.notaPhoto = await savePhoto(b.notaPhoto); b.scalePhoto = await savePhoto(b.scalePhoto); return D.createDeposit(c, b); });
   add('GET', '/api/deposits', async (c) => {
     need(c, [...ACTOR_ROLES, 'admin', 'pengawas']); const f = c.role === 'pengepul' ? { actorId: c.actor._id } : {}; if (c.query.status) f.status = c.query.status;
     const [ds, gs, as, bs] = [await col.deposits.find(f, { sort: { createdAt: -1 } }), await col.farmerGroups.find({}), await names(), await col.batches.find({})];
@@ -136,7 +136,7 @@ module.exports = function build(D, A) {
   add('GET', '/api/events', async (c) => { need(c, ['admin', 'pengawas']); const f = c.query.batchId ? { batchId: c.query.batchId } : {}; return (await col.events.find(f, { sort: { at: -1 }, limit: 100 })); });
   add('GET', '/api/config', async (c) => { need(c, ['admin', 'pengawas']); return D.cfg(); });
   add('PUT', '/api/config', async (c) => { need(c, ['admin'], true); const p = {}; for (const k of ['tolerancePct', 'depositSlaHours', 'samplingRate', 'qrQuotaPerPeriod', 'yieldAlertPct', 'hangingHours', 'scanAlertPerDay']) if (k in c.body) { const v = +c.body[k]; if (!(v >= 0)) throw bad(`${k} tidak valid`); p[k] = v; } if (['manual', 'smtp'].includes(c.body.notifierMode)) p.notifierMode = c.body.notifierMode; await D.cfg(); await col.appConfig.update({ _id: 'cfg' }, p); await D.audit(c, 'konfigurasi.ubah', JSON.stringify(p)); return D.cfg(); });
-  add('GET', '/api/notifications', async (c) => { const f = []; const all = await col.notifications.find({}, { sort: { at: -1 }, limit: 200 }); return all.filter((n) => (n.toActorId && n.toActorId === c.actor?._id) || (n.toRole && (n.toRole === c.role || (c.role === 'superadmin' && n.toRole === 'admin')))).slice(0, 30); });
+  add('GET', '/api/notifications', async (c) => { const f = []; const all = await col.notifications.find({}, { sort: { at: -1 }, limit: 200 }); return all.filter((n) => (n.toActorId && n.toActorId === c.actor?._id) || (n.toGroupId && n.toGroupId === c.user.groupId) || (n.toRole && (n.toRole === c.role || (c.role === 'superadmin' && n.toRole === 'admin')))).slice(0, 30); });
   add('POST', '/api/notifications/read', async (c) => { for (const n of await col.notifications.find({ read: false })) if ((n.toActorId && n.toActorId === c.actor?._id) || (n.toRole && n.toRole === c.role)) await col.notifications.update({ _id: n._id }, { read: true }); return { ok: true }; });
 
   // ----- integritas -----
@@ -146,7 +146,7 @@ module.exports = function build(D, A) {
   add('POST', '/api/integrity/restore', async (c) => { need(c, ['admin'], true); for (const e of await col.events.find({})) if (e.__orig) await col.events.update({ _id: e._id }, { payload: e.__orig, __orig: null }); return { ok: true }; });
 
   // ----- manajemen pengguna (admin) -----
-  const USER_ROLES = [...ACTOR_ROLES, 'admin', 'pengawas'];
+  const USER_ROLES = [...ACTOR_ROLES, 'admin', 'pengawas', 'kelompok_tani'];
   const pubU = (u, a) => ({ _id: u._id, name: u.name, email: u.email, role: u.role, active: u.active !== false, actorId: u.actorId, district: a?.district || '', lastLogin: u.lastLogin || null });
   const emailOk = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
   async function userGuard(c, id) {
@@ -157,7 +157,7 @@ module.exports = function build(D, A) {
   }
   add('GET', '/api/users', async (c) => {
     need(c, ['admin']); const as = await names();
-    return (await col.users.find({}, { sort: { name: 1 } })).filter((u) => u.role !== 'superadmin').map((u) => pubU(u, as[u.actorId]));
+    const gs = Object.fromEntries((await col.farmerGroups.find({})).map((g) => [g._id, g])); return (await col.users.find({}, { sort: { name: 1 } })).filter((u) => u.role !== 'superadmin').map((u) => ({ ...pubU(u, as[u.actorId]), groupId: u.groupId || null, groupName: gs[u.groupId]?.name || null }));
   });
   add('POST', '/api/users', async (c) => {
     need(c, ['admin'], true); const b = c.body;
@@ -166,9 +166,10 @@ module.exports = function build(D, A) {
     if (!b.name || !emailOk(email)) throw bad('Nama dan email yang valid wajib diisi');
     { const issue = sec.passwordIssue(b.password); if (issue) throw bad(issue); }
     if (await col.users.findOne({ email })) throw conflict('Email sudah terdaftar');
+    let groupId = null; if (b.role === 'kelompok_tani') { const g = await col.farmerGroups.findOne({ _id: b.groupId }); if (!g) throw bad('Pilih kelompok tani untuk peran ini'); groupId = g._id; }
     let actor = null;
     if (ACTOR_ROLES.includes(b.role)) actor = await col.actors.insert({ name: b.name, role: b.role, district: b.district || '', lat: +b.lat || -6.6, lng: +b.lng || 107.6, createdAt: D.now() });
-    const u = await col.users.insert({ email, passwordHash: auth.hashPassword(String(b.password)), name: b.name, role: b.role, actorId: actor?._id || null, active: true });
+    const u = await col.users.insert({ email, passwordHash: auth.hashPassword(String(b.password)), name: b.name, role: b.role, actorId: actor?._id || null, groupId, active: true });
     await D.audit(c, 'pengguna.buat', `${email} (${b.role})`); return pubU(u, actor);
   });
   add('PUT', '/api/users/:id', async (c) => {
@@ -180,7 +181,7 @@ module.exports = function build(D, A) {
     if ('active' in b && !b.active) p.sv = (u.sv || 0) + 1;
     if ('role' in b && b.role !== u.role) {
       if (!USER_ROLES.includes(b.role)) throw bad('Peran tidak valid');
-      if (u.actorId) throw bad('Peran pelaku rantai pasok tidak bisa diubah karena sudah punya riwayat; nonaktifkan lalu buat akun baru');
+      if (u.actorId || u.groupId) throw bad('Peran pelaku rantai pasok tidak bisa diubah karena sudah punya riwayat; nonaktifkan lalu buat akun baru');
       if (ACTOR_ROLES.includes(b.role)) throw bad('Peran internal tidak bisa diubah menjadi pelaku rantai pasok; buat akun baru');
       p.role = b.role;
     }
@@ -206,6 +207,6 @@ module.exports = function build(D, A) {
 
   // ----- QR -----
   add('GET', '/api/qr', async (c) => ({ svg: qr.svg(c.query.text || '') }), { public: true });
-  require('./routes-ops')({ D, add, need, ACTOR_ROLES, bad, notFound });
+  const rc = { D, add, need, ACTOR_ROLES, bad, notFound, forbid, conflict, sec, auth, names, pubUser }; require('./routes-ops')(rc); require('./routes-partner')(rc);
   return R;
 };
