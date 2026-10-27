@@ -1,6 +1,6 @@
 // Uji alur end-to-end lewat HTTP. Jalankan: node test/smoke.js
 const os = require('os'), fs = require('fs'), path = require('path'), assert = require('assert');
-process.env.LP_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'lp-test-'));
+process.env.LOG = '0'; process.env.LP_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'lp-test-'));
 const { start } = require('../server/index.js');
 (async () => {
   const s = await start({ port: 0 }); const base = 'http://localhost:' + s.server.address().port; let fails = 0;
@@ -53,7 +53,7 @@ const { start } = require('../server/index.js');
   });
   await t('dashboard & analitik', async () => { const d = (await call('/api/dashboard', { token: T.pengawas })).j; assert.ok(d.metrics.batchActive > 0 && d.report.bullets.length && d.points.length); });
   await t('QR SVG', async () => { const r = await fetch(base + '/qr/LP-PKG-2026-0211.svg'); assert.ok((await r.text()).startsWith('<svg')); });
-  await t('registrasi wajib referral', async () => { assert.strictEqual((await call('/api/register', { method: 'POST', body: { code: 'NGAWUR', name: 'X', email: 'x@x.id', password: '12345678' } })).status, 400); assert.strictEqual((await call('/api/register', { method: 'POST', body: { code: 'LAMA-0001', name: 'X', email: 'x@x.id', password: '12345678' } })).status, 400); const r = await call('/api/register', { method: 'POST', body: { code: 'PENGEPUL-DEMO1', name: 'CV Baru', email: 'baru@x.id', password: '12345678', district: 'Subang' } }); assert.strictEqual(r.status, 200); assert.ok(await call('/api/login', { method: 'POST', body: { email: 'baru@x.id', password: '12345678' } }).then((x) => x.j.token)); });
+  await t('registrasi wajib referral', async () => { assert.strictEqual((await call('/api/register', { method: 'POST', body: { code: 'NGAWUR', name: 'X', email: 'x@x.id', password: 'sandi12345' } })).status, 400); assert.strictEqual((await call('/api/register', { method: 'POST', body: { code: 'LAMA-0001', name: 'X', email: 'x@x.id', password: 'sandi12345' } })).status, 400); const r = await call('/api/register', { method: 'POST', body: { code: 'PENGEPUL-DEMO1', name: 'CV Baru', email: 'baru@x.id', password: 'sandi12345', district: 'Subang' } }); assert.strictEqual(r.status, 200); assert.ok(await call('/api/login', { method: 'POST', body: { email: 'baru@x.id', password: 'sandi12345' } }).then((x) => x.j.token)); });
   await t('CRUD pengguna oleh admin', async () => {
     const b = { role: 'logistik', name: 'Logistik Baru', email: 'baru@lestari.id', password: 'rahasia123', district: 'Subang' };
     assert.strictEqual((await call('/api/users', { method: 'POST', token: T.pengepul1, body: b })).status, 403);
@@ -69,6 +69,29 @@ const { start } = require('../server/index.js');
     const all = (await call('/api/users', { token: T.admin })).j; assert.ok(!all.some((u) => u.email === 'baru@lestari.id') && !all.some((u) => u.role === 'superadmin'));
     const pg = all.find((u) => u.email === 'pengepul1@lestari.id'); assert.strictEqual((await call('/api/users/' + pg._id, { method: 'DELETE', token: T.admin })).status, 409);
     const adm = all.find((u) => u.email === 'admin@lestari.id'); assert.strictEqual((await call('/api/users/' + adm._id, { method: 'DELETE', token: T.admin })).status, 403);
+  });
+  await t('login dikunci setelah percobaan gagal berulang', async () => {
+    for (let i = 0; i < 5; i++) assert.strictEqual((await call('/api/login', { method: 'POST', body: { email: 'kunci@lestari.id', password: 'salah' + i } })).status, 401);
+    assert.strictEqual((await call('/api/login', { method: 'POST', body: { email: 'kunci@lestari.id', password: 'salah' } })).status, 429);
+  });
+  await t('ganti sandi, sesi lama dicabut, logout mencabut sesi', async () => {
+    const tk = await login('pengepul3@lestari.id');
+    assert.strictEqual((await call('/api/me/password', { method: 'POST', token: tk, body: { current: 'salah', next: 'baru12345' } })).status, 400);
+    assert.strictEqual((await call('/api/me/password', { method: 'POST', token: tk, body: { current: 'lestari123', next: 'pendek' } })).status, 400);
+    const ch = await call('/api/me/password', { method: 'POST', token: tk, body: { current: 'lestari123', next: 'baru12345' } }); assert.strictEqual(ch.status, 200);
+    assert.strictEqual((await call('/api/me', { token: tk })).status, 401);
+    assert.strictEqual((await call('/api/me', { token: ch.j.token })).status, 200);
+    assert.strictEqual((await call('/api/logout', { method: 'POST', token: ch.j.token })).status, 200);
+    assert.strictEqual((await call('/api/me', { token: ch.j.token })).status, 401);
+  });
+  await t('health, alias /api/v1, header keamanan', async () => {
+    assert.strictEqual((await call('/api/health')).j.ok, true); assert.strictEqual((await call('/api/v1/health')).j.ok, true);
+    const r = await fetch(base + '/api/health'); assert.strictEqual(r.headers.get('x-content-type-options'), 'nosniff'); assert.ok(r.headers.get('content-security-policy')); assert.ok(r.headers.get('x-request-id'));
+  });
+  await t('berkas palsu berekstensi gambar ditolak', async () => {
+    const g = (await call('/api/groups', { token: T.pengepul1 })).j[0];
+    const fake = 'data:image/png;base64,' + Buffer.from('<?php echo 1; ?>').toString('base64');
+    const r = await call('/api/deposits', { method: 'POST', token: T.pengepul1, body: { farmerGroupId: g._id, groupCode: 'SUM-4821', weightKg: 100, notaNo: 'FAKE-1', notaPhoto: fake, scalePhoto: fake } }); assert.strictEqual(r.status, 400);
   });
   await s.close(); console.log(fails ? `\n${fails} uji gagal` : '\nSemua uji lulus'); process.exit(fails ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(1); });

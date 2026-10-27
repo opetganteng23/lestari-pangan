@@ -1,5 +1,5 @@
 const fs = require('fs'), path = require('path'), crypto = require('crypto');
-const auth = require('./auth'); const qr = require('./qr');
+const auth = require('./auth'); const qr = require('./qr'); const sec = require('./security');
 const UP = path.join(require('./paths').DATA, 'uploads'); fs.mkdirSync(UP, { recursive: true });
 
 module.exports = function build(D, A) {
@@ -16,21 +16,33 @@ module.exports = function build(D, A) {
   const names = async () => Object.fromEntries((await col.actors.find({})).map((a) => [a._id, a]));
   async function savePhoto(d) {
     if (!d) return null; const m = /^data:image\/(jpeg|png|webp);base64,(.+)$/.exec(d); if (!m) throw bad('Format foto tidak valid');
-    const buf = Buffer.from(m[2], 'base64'); if (buf.length > 2.5e6) throw bad('Foto terlalu besar (maks 2,5 MB)');
+    const buf = Buffer.from(m[2], 'base64'); if (buf.length > 2.5e6) throw bad('Foto terlalu besar (maks 2,5 MB)'); const real = sec.sniffImage(buf); if (!real) throw bad('Isi berkas bukan gambar yang valid'); m[1] = real;
     const id = crypto.randomBytes(10).toString('hex') + '.' + (m[1] === 'jpeg' ? 'jpg' : m[1]); fs.writeFileSync(path.join(UP, id), buf); return '/uploads/' + id;
   }
 
   // ----- publik -----
   add('GET', '/api/public/trace/:code', async (c) => D.trace(decodeURIComponent(c.params.code)), { public: true });
+  const loginLimiter = sec.createLimiter({ max: +process.env.LOGIN_MAX_FAILS || 5, windowMs: (+process.env.LOGIN_LOCK_MIN || 15) * 60000 });
   add('POST', '/api/login', async (c) => {
-    const u = await col.users.findOne({ email: String(c.body.email || '').toLowerCase().trim() });
-    if (!u || !u.active || !auth.checkPassword(String(c.body.password || ''), u.passwordHash)) throw new D.HttpError(401, 'Email atau kata sandi salah');
-    await D.audit({ user: u }, 'login', u.email); return { token: auth.sign({ uid: u._id }, 12 * 3600), user: pubUser(u) };
+    const email = String(c.body.email || '').toLowerCase().trim(); const key = (c.ip || '?') + '|' + email;
+    if (loginLimiter.blocked(key)) throw new D.HttpError(429, `Terlalu banyak percobaan gagal. Coba lagi dalam ${Math.ceil(loginLimiter.retryAfter(key) / 60)} menit.`);
+    const u = await col.users.findOne({ email });
+    if (!u || !u.active || !auth.checkPassword(String(c.body.password || ''), u.passwordHash)) { loginLimiter.hit(key); throw new D.HttpError(401, 'Email atau kata sandi salah'); }
+    loginLimiter.clear(key); await col.users.update({ _id: u._id }, { lastLogin: D.now() });
+    await D.audit({ user: u }, 'login', u.email); return { token: auth.sign({ uid: u._id, sv: u.sv || 0 }, 12 * 3600), user: pubUser(u) };
   }, { public: true });
+  add('GET', '/api/health', async () => ({ ok: true, store: A.storeKind, uptimeSec: Math.round(process.uptime()), time: D.now() }), { public: true });
+  add('POST', '/api/logout', async (c) => { await col.users.update({ _id: c.user._id }, { sv: (c.user.sv || 0) + 1 }); await D.audit(c, 'logout', c.user.email); return { ok: true }; });
+  add('POST', '/api/me/password', async (c) => {
+    const b = c.body; if (!auth.checkPassword(String(b.current || ''), c.user.passwordHash)) throw bad('Kata sandi saat ini salah');
+    const issue = sec.passwordIssue(b.next); if (issue) throw bad(issue); if (b.next === b.current) throw bad('Kata sandi baru harus berbeda');
+    const sv = (c.user.sv || 0) + 1; await col.users.update({ _id: c.user._id }, { passwordHash: auth.hashPassword(String(b.next)), sv });
+    await D.audit(c, 'sandi.ganti', c.user.email); return { token: auth.sign({ uid: c.user._id, sv }, 12 * 3600) };
+  });
   add('POST', '/api/register', async (c) => {
     const b = c.body; const code = await col.referralCodes.findOne({ code: String(b.code || '').trim().toUpperCase() });
     if (!code || !code.active || (code.expiresAt && code.expiresAt < D.now()) || code.uses >= code.maxUses) throw bad('Kode referral tidak valid, kedaluwarsa, atau sudah habis dipakai');
-    if (!b.email || !b.password || b.password.length < 8 || !b.name) throw bad('Nama, email, dan kata sandi (min. 8 karakter) wajib');
+    if (!b.email || !b.name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(b.email))) throw bad('Nama dan email yang valid wajib'); { const issue = sec.passwordIssue(b.password); if (issue) throw bad(issue); }
     if (await col.users.findOne({ email: b.email.toLowerCase() })) throw conflict('Email sudah terdaftar');
     const actor = await col.actors.insert({ name: b.name, role: code.role, district: b.district || '', lat: +b.lat || -6.6, lng: +b.lng || 107.6, createdAt: D.now() });
     const u = await col.users.insert({ email: b.email.toLowerCase(), passwordHash: auth.hashPassword(b.password), name: b.name, role: code.role, actorId: actor._id, active: true });
@@ -117,7 +129,7 @@ module.exports = function build(D, A) {
     return { metrics: m, points, anomalies: [...virtual, ...an].sort((a, b) => (a.at < b.at ? 1 : -1)).slice(0, 12), report: await A.latest() };
   });
   add('POST', '/api/analytics/run', async (c) => { need(c, ['admin', 'pengawas'], true); return A.run(); });
-  add('GET', '/api/audit', async (c) => { need(c, ['admin', 'pengawas']); return col.auditLogs.find({}, { sort: { at: -1 }, limit: 200 }); });
+  add('GET', '/api/audit', async (c) => { need(c, ['admin', 'pengawas']); const lim = Math.min(500, Math.max(1, +c.query.limit || 200)), off = Math.max(0, +c.query.offset || 0); const all = await col.auditLogs.find({}, { sort: { at: -1 }, limit: off + lim }); return all.slice(off); });
   add('GET', '/api/events', async (c) => { need(c, ['admin', 'pengawas']); const f = c.query.batchId ? { batchId: c.query.batchId } : {}; return (await col.events.find(f, { sort: { at: -1 }, limit: 100 })); });
   add('GET', '/api/config', async (c) => { need(c, ['admin', 'pengawas']); return D.cfg(); });
   add('PUT', '/api/config', async (c) => { need(c, ['admin'], true); const p = {}; for (const k of ['tolerancePct', 'depositSlaHours', 'samplingRate', 'qrQuotaPerPeriod', 'yieldAlertPct', 'hangingHours']) if (k in c.body) { const v = +c.body[k]; if (!(v >= 0)) throw bad(`${k} tidak valid`); p[k] = v; } if (['manual', 'smtp'].includes(c.body.notifierMode)) p.notifierMode = c.body.notifierMode; await D.cfg(); await col.appConfig.update({ _id: 'cfg' }, p); await D.audit(c, 'konfigurasi.ubah', JSON.stringify(p)); return D.cfg(); });
@@ -149,7 +161,7 @@ module.exports = function build(D, A) {
     if (!USER_ROLES.includes(b.role)) throw bad('Peran tidak valid');
     const email = String(b.email || '').toLowerCase().trim();
     if (!b.name || !emailOk(email)) throw bad('Nama dan email yang valid wajib diisi');
-    if (!b.password || String(b.password).length < 8) throw bad('Kata sandi minimal 8 karakter');
+    { const issue = sec.passwordIssue(b.password); if (issue) throw bad(issue); }
     if (await col.users.findOne({ email })) throw conflict('Email sudah terdaftar');
     let actor = null;
     if (ACTOR_ROLES.includes(b.role)) actor = await col.actors.insert({ name: b.name, role: b.role, district: b.district || '', lat: +b.lat || -6.6, lng: +b.lng || 107.6, createdAt: D.now() });
@@ -161,7 +173,8 @@ module.exports = function build(D, A) {
     if ('name' in b) { if (!String(b.name).trim()) throw bad('Nama wajib'); p.name = String(b.name).trim(); }
     if ('email' in b) { const e = String(b.email).toLowerCase().trim(); if (!emailOk(e)) throw bad('Email tidak valid'); const x = await col.users.findOne({ email: e }); if (x && x._id !== u._id) throw conflict('Email sudah terdaftar'); p.email = e; }
     if ('active' in b) p.active = !!b.active;
-    if (b.password) { if (String(b.password).length < 8) throw bad('Kata sandi minimal 8 karakter'); p.passwordHash = auth.hashPassword(String(b.password)); }
+    if (b.password) { const issue = sec.passwordIssue(b.password); if (issue) throw bad(issue); p.passwordHash = auth.hashPassword(String(b.password)); p.sv = (u.sv || 0) + 1; }
+    if ('active' in b && !b.active) p.sv = (u.sv || 0) + 1;
     if ('role' in b && b.role !== u.role) {
       if (!USER_ROLES.includes(b.role)) throw bad('Peran tidak valid');
       if (u.actorId) throw bad('Peran pelaku rantai pasok tidak bisa diubah karena sudah punya riwayat; nonaktifkan lalu buat akun baru');

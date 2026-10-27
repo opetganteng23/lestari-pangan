@@ -51,8 +51,10 @@ const NAV = {
   superadmin: [['mode-tindak', 'Mode Tindak'], ['mode-lihat', 'Mode Lihat'], ['dashboard', 'Dashboard Pengawasan'], ['verifikasi', 'Antrean Verifikasi', 'pending'], ['pengguna', 'Pengguna'], ['pelaku', 'Pelaku & Kode Referral'], ['kelompok', 'Kelompok Tani'], ['sengketa', 'Sengketa Transfer', 'disputed'], ['tracelog', 'Trace Log'], ['anomali', 'Anomali'], ['tren', 'Tren Pasokan'], ['integritas', 'Integritas Blockchain'], ['konfigurasi', 'Konfigurasi'], ['audit', 'Audit Log']],
 };
 
+for (const k of Object.keys(NAV)) NAV[k].push(['profil', 'Profil & Keamanan']);
+
 // ---------- sesi ----------
-function logout() { sd('lp_token', null); ss.set('lp_act', null); ss.set('lp_view', null); me = null; location.hash = ''; renderLogin(); }
+function logout(done) { if (!done && ld('lp_token')) { fetch('/api/logout', { method: 'POST', headers: { authorization: 'Bearer ' + ld('lp_token'), 'content-type': 'application/json' }, body: '{}' }).catch(() => {}); } sd('lp_token', null); ss.set('lp_act', null); ss.set('lp_view', null); me = null; location.hash = ''; renderLogin(); }
 async function loadMe() { me = await api('/api/me'); return me; }
 async function boot() {
   const m = location.hash.match(/^#\/t\/(.+)/); if (m) { location.href = '/t/' + m[1]; return; }

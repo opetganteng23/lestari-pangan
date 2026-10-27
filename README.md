@@ -8,7 +8,9 @@ node server/index.js        # Node 18+, tanpa npm install
 # buka http://localhost:3000
 ```
 Pertama kali jalan, data simulasi otomatis dimuat. Reset data: hapus folder `data/` lalu jalankan ulang.
-Uji otomatis: `node test/smoke.js` (21 uji alur end-to-end).
+Uji otomatis: `npm test` (uji unit keamanan + uji alur end-to-end).
+Cadangan data: `npm run backup` · pulihkan: `npm run restore -- backups/<folder> --yes` (hentikan server dulu).
+Cek kesehatan: `GET /api/health`.
 
 ## Akun demo (kata sandi semua: `lestari123`)
 | Email | Peran |
@@ -58,6 +60,7 @@ lestari-pangan/
 - `PORT` (3000) · `APP_SECRET` · `LP_DATA_DIR`
 - `MONGODB_URI` (+ `npm i mongodb`) — pakai MongoDB, bukan berkas JSON. **Adapter ini ditulis tetapi belum diuji** (sandbox pengembangan tidak punya MongoDB).
 - `ANTHROPIC_API_KEY` (+ opsional `ANTHROPIC_MODEL`) — ringkasan pengawas ditarasikan Claude; angka tetap dihitung kode. Tanpa kunci: narasi berbasis aturan (diberi label). Belum diuji dengan API asli.
+- `LOGIN_MAX_FAILS` (5) · `LOGIN_LOCK_MIN` (15) · `RATE_LIMIT_PER_MIN` (600) · `TRUST_PROXY=1` (percaya `X-Forwarded-For` di balik proxy) · `LOG=0` (matikan log permintaan)
 - `DEMO_MODE=0` — matikan alat demo "ubah data event".
 - Notifikasi: mode manual (pemberitahuan dalam aplikasi). Mode SMTP baru menandai antrean; pengiriman email nyata belum diimplementasikan.
 
@@ -65,4 +68,4 @@ lestari-pangan/
 - **Blockchain = simulasi hash-chain lokal** (`server/ledger.js`), bukan EVM testnet. Antarmukanya (`anchor`, `lookup`, `verifyChain`) dibuat agar bisa diganti adapter ethers.js + kontrak `LPAnchor`.
 - Foto disimpan di `data/uploads` (URL tidak bisa ditebak, tanpa kontrol akses).
 - Peta skematis SVG, belum Leaflet. Pemindaian QR lewat kamera belum ada (kode QR bisa dibuka sebagai tautan).
-- Tidak ada pembatasan laju login, CSRF, atau pemulihan kata sandi.
+- Pemulihan kata sandi mandiri (butuh email) belum ada; admin bisa mereset. Backup belum terenkripsi/terjadwal.

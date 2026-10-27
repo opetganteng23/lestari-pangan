@@ -8,9 +8,9 @@ Legenda: **Ada** = berfungsi dan teruji smoke; **Sebagian** = ada versi dasar; *
 
 | Status | Jumlah baris |
 |---|---|
-| Ada | 15 |
-| Sebagian | 13 |
-| Belum | 40 |
+| Ada | 21 |
+| Sebagian | 19 |
+| Belum | 28 |
 
 ## Per bagian MTS
 
@@ -46,31 +46,31 @@ Legenda: **Ada** = berfungsi dan teruji smoke; **Sebagian** = ada versi dasar; *
 | 15.1–15.2 | Notifikasi dalam aplikasi | Ada | Lonceng + badge |
 | 15.2 | Notifikasi email | Belum | SMTP hanya menandai antrean |
 | 15.3 | Job idempotent, backoff, dead-letter, status kirim | Sebagian | Outbox anchor dengan retry; belum untuk notifikasi |
-| 16.1 | Prefix `/api/v1` | Belum | Saat ini `/api` |
-| 16.1 | Validasi skema request | Belum | Validasi manual per endpoint |
-| 16.1 | Pagination & filter daftar | Belum | Sebagian daftar dibatasi `limit` |
+| 16.1 | Prefix `/api/v1` | Sebagian | `/api/v1/...` berfungsi sebagai alias; jalur resmi masih `/api` |
+| 16.1 | Validasi skema request | Sebagian | Pustaka `validate()` di `server/security.js`; baru diuji unit, belum dipasang di semua endpoint |
+| 16.1 | Pagination & filter daftar | Sebagian | Audit log mendukung `limit`/`offset`; daftar lain belum |
 | 16.1 | Idempotency key | Belum |  |
-| 16.1 | Rate limiting | Belum |  |
+| 16.1 | Rate limiting | Ada | Per-IP 600/menit; login 5 gagal/15 menit (bisa diatur lewat env) |
 | 16.1 | OpenAPI | Belum |  |
 | 16.1 | API client/partner dengan scope | Belum |  |
-| 16.2 | Auth: logout, refresh, reset sandi | Belum | Hanya login |
+| 16.2 | Auth: logout, refresh, reset sandi | Sebagian | Logout, ganti sandi mandiri, pencabutan sesi ada; reset sandi mandiri (butuh email) belum |
 | 16.2 | Endpoint `/cases`, `/exports`, `/ai`, `/integrations`, `/anchors`, `/products/:id/passport` | Belum |  |
 | 17.1 | Hash sandi (scrypt) | Ada |  |
-| 17.1 | Token sesi bertanda tangan, masa berlaku | Sebagian | 12 jam; tanpa pencabutan sesi / refresh |
-| 17.1 | Perlindungan brute-force | Belum |  |
+| 17.1 | Token sesi bertanda tangan, masa berlaku | Ada | 12 jam; pencabutan lewat versi sesi (`sv`) saat logout, ganti/reset sandi, nonaktif |
+| 17.1 | Perlindungan brute-force | Ada | Penguncian per IP+email |
 | 17.1 | Autentikasi ulang aksi sensitif | Sebagian | Hanya Mode Tindak |
 | 17.1 | MFA akun istimewa | Belum |  |
 | 17.1 | Batas ukuran request, nama file acak | Ada | 8 MB; foto maks 2,5 MB |
-| 17.1 | Validasi MIME dari isi file | Sebagian | Cek prefiks data-URL, bukan isi file |
+| 17.1 | Validasi MIME dari isi file | Ada | Tipe gambar ditentukan dari byte awal berkas |
 | 17.1 | Penyimpanan bukti privat + signed URL | Belum | `/uploads/` publik (nama acak) |
-| 17.1 | CSRF / CORS ketat | Belum | Bearer di header (CSRF kecil risikonya); CORS belum diatur eksplisit |
-| 17.1 | Security headers (CSP, HSTS, dll.) | Belum |  |
+| 17.1 | CSRF / CORS ketat | Sebagian | Token di header Authorization (bukan cookie); tidak ada CORS lintas origin; CSP `frame-ancestors none` |
+| 17.1 | Security headers (CSP, HSTS, dll.) | Ada | CSP, nosniff, X-Frame-Options, Referrer-Policy, Permissions-Policy, HSTS di balik https |
 | 17.1 | Error tanpa stack trace | Ada |  |
 | 17.1 | Scan dependensi, backup terenkripsi | Belum |  |
 | 17.2 | Klasifikasi data, retensi, log akses dokumen | Belum |  |
 | 17.3 | Mode Lihat baca-saja, Mode Tindak + banner + audit + notifikasi | Ada |  |
 | 17.3 | Pencabutan sesi mode istimewa | Belum | Kedaluwarsa otomatis saja |
-| 17.4 | Backup / restore / RPO-RTO | Belum |  |
+| 17.4 | Backup / restore / RPO-RTO | Sebagian | `npm run backup` / `npm run restore`; belum terenkripsi dan belum terjadwal |
 | 18 | UI responsif, dashboard per peran | Ada | Admin, pengawas, 5 peran pelaku |
 | 18 | Peta sebaran | Sebagian | SVG skematis, belum Leaflet |
 | 18 | Design system terdokumentasi | Belum |  |
@@ -78,11 +78,11 @@ Legenda: **Ada** = berfungsi dan teruji smoke; **Sebagian** = ada versi dasar; *
 | 19.2–19.3 | Laporan & ekspor CSV/XLSX/PDF | Belum |  |
 | 20 | Konfigurasi env + operasional | Ada | Tujuh kunci konfigurasi |
 | 21 | Uji smoke end-to-end | Ada |  |
-| 21 | Uji unit, integrasi terpisah, UI, beban, keamanan | Belum |  |
-| 22 | Deployment, observability (log terstruktur, metrik, health check) | Belum | Tidak ada `/health` |
+| 21 | Uji unit, integrasi terpisah, UI, beban, keamanan | Sebagian | `test/unit.js` untuk modul keamanan/auth; belum ada uji UI/beban/keamanan |
+| 22 | Deployment, observability (log terstruktur, metrik, health check) | Sebagian | `/api/health` dan log JSON per permintaan (`x-request-id`) ada; metrik belum |
 | – | Offline-first | Belum |  |
 | – | Pemindaian QR kamera | Belum |  |
-| – | Ganti sandi mandiri / profil pengguna | Belum | Admin bisa reset |
+| – | Ganti sandi mandiri / profil pengguna | Ada | Halaman Profil & Keamanan untuk semua peran |
 | – | Integrasi timbangan / logistik pihak ketiga | Belum |  |
 
 ## Prioritas yang disarankan (mengikuti roadmap v0.3)
