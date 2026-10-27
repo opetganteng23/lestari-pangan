@@ -45,13 +45,14 @@ lestari-pangan/
 │  ├─ js/screens-admin.js  layar admin, pengawas, super admin, pengguna
 │  └─ assets/fonts · img
 ├─ test/smoke.js           uji end-to-end
-├─ docs/mts.md             Master Technical Specification
+├─ docs/mts.md             MTS v0.3 (spesifikasi target)
+├─ docs/mts-v0.2-baseline.md  baseline sesuai kode saat ini
 ├─ docs/fitur-per-peran.md
 └─ data/                   data runtime (di-ignore git)
 ```
 
 ## Dokumen
-- [MTS](docs/mts.md) · [Fitur per peran](docs/fitur-per-peran.md)
+- [MTS v0.3 (target)](docs/mts.md) · [Baseline v0.2 (sesuai kode)](docs/mts-v0.2-baseline.md) · [Fitur per peran](docs/fitur-per-peran.md)
 
 ## Konfigurasi opsional (variabel lingkungan)
 - `PORT` (3000) · `APP_SECRET` · `LP_DATA_DIR`
