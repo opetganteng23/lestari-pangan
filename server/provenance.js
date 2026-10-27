@@ -75,8 +75,13 @@ module.exports = function createProvenance(D) {
     if (t.tainted) lim.push('Sebagian rantai berasal dari setoran yang ditolak verifikasi.');
     if (ledger.simulated) lim.push('Pencatatan integritas memakai ledger simulasi lokal, bukan blockchain publik.');
     lim.push('Halaman ini tidak menyatakan sertifikasi mutu, keamanan pangan, atau klaim organik.');
+    // info recall: hanya yang sudah dipublikasikan oleh keputusan manusia berwenang
+    const rb = (await col.batches.findOne({ 'meta.lot': code })) || (await col.batches.findOne({ code })) || (await col.batches.findOne({ qrCode: code }));
+    const ids = rb ? (await D.ancestors(rb)).map((x) => x._id) : []; let recall = null;
+    const pub = (await col.cases.find({})).filter((c) => c.decisions.some((d) => d.action === 'recall' && d.scopeIds.some((i) => ids.includes(i))) && c.decisions.some((d) => d.action === 'publish_recall'));
+    if (pub.length) { recall = { published: true, notes: pub.map((c) => { const d = c.decisions.filter((x) => x.action === 'publish_recall').pop(); return { text: d.publicNote, at: d.at }; }) }; lim.unshift('Ada pemberitahuan penarikan (recall) untuk produk ini. Baca pemberitahuan di bagian atas halaman.'); }
     const levels = {}; for (const s of steps) levels[s.verification.level] = (levels[s.verification.level] || 0) + 1;
-    return { ...t, steps, verificationSummary: levels, limitations: lim, ledger: { network: ledger.network, simulated: !!ledger.simulated }, recall: null, generatedAt: D.now() };
+    return { ...t, steps, verificationSummary: levels, limitations: lim, ledger: { network: ledger.network, simulated: !!ledger.simulated }, recall, generatedAt: D.now() };
   }
 
   // Catat pemindaian publik; tanda bila satu lot dipindai tak wajar. Sinyal risiko, bukan bukti pemalsuan.

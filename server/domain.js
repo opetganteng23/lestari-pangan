@@ -12,20 +12,23 @@ const round = (n, d = 1) => Math.round(n * 10 ** d) / 10 ** d;
 
 module.exports = function createDomain(store) {
   const C = (n) => store.col(n);
-  const col = Object.fromEntries(['users', 'actors', 'referralCodes', 'farmerGroups', 'qrLabels', 'deposits', 'batches', 'transfers', 'events', 'outbox', 'anomalies', 'notifications', 'auditLogs', 'appConfig', 'counters', 'analyticsReports', 'scans'].map((n) => [n, C(n)]));
+  const col = Object.fromEntries(['users', 'actors', 'referralCodes', 'farmerGroups', 'qrLabels', 'deposits', 'batches', 'transfers', 'events', 'outbox', 'anomalies', 'notifications', 'auditLogs', 'appConfig', 'counters', 'analyticsReports', 'scans', 'cases', 'corrections', 'emails', 'exportsLog', 'aiLogs', 'apiKeys', 'idem', 'deviceReadings', 'forecastRuns', 'simulations'].map((n) => [n, C(n)]));
 
-  const DEFAULT_CFG = { _id: 'cfg', tolerancePct: 2, depositSlaHours: 24, samplingRate: 30, qrQuotaPerPeriod: 200, yieldAlertPct: 55, hangingHours: 48, scanAlertPerDay: 100, notifierMode: 'manual' };
+  const DEFAULT_CFG = { _id: 'cfg', tolerancePct: 2, depositSlaHours: 24, samplingRate: 30, qrQuotaPerPeriod: 200, yieldAlertPct: 55, hangingHours: 48, scanAlertPerDay: 100, massBalanceTolerancePct: 3, forecastMinWeeks: 12, notifierMode: 'manual' };
   async function cfg() { let c = await col.appConfig.findOne({ _id: 'cfg' }); if (!c) c = await col.appConfig.insert({ ...DEFAULT_CFG }); return c; }
   async function seq(name) { let c = await col.counters.findOne({ _id: name }); if (!c) await col.counters.insert({ _id: name, n: 0 }); const n = (c ? c.n : 0) + 1; await col.counters.update({ _id: name }, { n }); return n; }
   const pad = (n, w = 6) => String(n).padStart(w, '0');
 
+  const hooks = {};
   // ---------- audit & notifikasi ----------
   async function audit(ctx, action, detail) {
     await col.auditLogs.insert({ at: now(), userId: ctx?.user?._id, userName: ctx?.user?.name, role: ctx?.user?.role, action, detail: detail || '', act: ctx?.act ? { role: ctx.act.role, actorId: ctx.act.actorId, reason: ctx.act.reason } : undefined });
   }
-  async function notify({ toRole, toActorId, text, link }) {
+  async function notify({ toRole, toActorId, toGroupId, text, link }) {
     const c = await cfg();
-    await col.notifications.insert({ toRole, toActorId, text, link, channel: c.notifierMode, at: now(), read: false, delivery: c.notifierMode === 'smtp' ? 'antri-smtp' : 'manual' });
+    const n = await col.notifications.insert({ toRole, toActorId, toGroupId, text, link, channel: c.notifierMode, at: now(), read: false, delivery: c.notifierMode === 'smtp' ? 'antri-smtp' : 'manual' });
+    if (c.notifierMode === 'smtp' && hooks.email) { try { await hooks.email(n); } catch (e) { console.error('hook email:', e.message); } }
+    return n;
   }
 
   // ---------- event + outbox + anchor ----------
@@ -69,7 +72,7 @@ module.exports = function createDomain(store) {
   }
 
   // ---------- anomali ----------
-  async function anomaly(type, severity, text, extra = {}) { return col.anomalies.insert({ type, severity, text, at: now(), resolved: false, ...extra }); }
+  async function anomaly(type, severity, text, extra = {}) { const a = await col.anomalies.insert({ type, severity, text, at: now(), resolved: false, ...extra }); if (hooks.anomaly) { try { await hooks.anomaly(a); } catch (e) { console.error('hook anomali:', e.message); } } return a; }
 
   // ---------- master ----------
   async function pengepulGroups(actorId) { return (await col.farmerGroups.find({ active: true })).filter((g) => (g.linkedActorIds || []).includes(actorId)); }
@@ -193,10 +196,11 @@ module.exports = function createDomain(store) {
     }
     return Object.values(out).map((o) => ({ ...o, pct: round(o.share * 100) })).sort((a, b) => b.pct - a.pct);
   }
+  function holdCheck(b) { if (b.hold) throw conflict(`Batch ${b.code} sedang ditahan (kasus ${b.hold.caseCode || b.hold.caseId}); hubungi admin`); }
   async function mergeBatches(ctx, ids) {
     const a = ctx.actor; if (!a) throw bad('Memerlukan pelaku'); if (!Array.isArray(ids) || ids.length < 2) throw bad('Pilih minimal 2 batch');
     const bs = []; for (const id of ids) bs.push(await batchById(id));
-    for (const b of bs) { if (b.ownerActorId !== a._id) throw forbid('Batch bukan milik Anda'); if (b.status === 'pending_verification') throw conflict(`${b.code} belum diverifikasi; tidak bisa digabung`); if (b.status !== 'available') throw conflict(`${b.code} tidak tersedia`); if (b.commodity !== bs[0].commodity) throw bad('Komoditas harus sama'); }
+    for (const b of bs) { holdCheck(b); if (b.ownerActorId !== a._id) throw forbid('Batch bukan milik Anda'); if (b.status === 'pending_verification') throw conflict(`${b.code} belum diverifikasi; tidak bisa digabung`); if (b.status !== 'available') throw conflict(`${b.code} tidak tersedia`); if (b.commodity !== bs[0].commodity) throw bad('Komoditas harus sama'); }
     const seqN = await seq('batch');
     const nb = await col.batches.insert({ code: `LP-BATCH-2026-${pad(seqN)}`, kind: 'merged', commodity: bs[0].commodity, weightKg: bs.reduce((s, b) => s + b.weightKg, 0), ownerActorId: a._id, status: 'available', parents: bs.map((b) => ({ batchId: b._id, weightKg: b.weightKg })), tainted: bs.some((b) => b.tainted), createdAt: now() });
     for (const b of bs) await col.batches.update({ _id: b._id }, { status: 'merged' });
@@ -208,6 +212,7 @@ module.exports = function createDomain(store) {
   async function sendTransfer(ctx, d) {
     const a = ctx.actor; if (!a) throw bad('Memerlukan pelaku');
     const b = await batchById(d.batchId); if (b.ownerActorId !== a._id) throw forbid('Batch bukan milik Anda');
+    holdCheck(b);
     if (b.status === 'pending_verification') throw conflict('Batch belum diverifikasi admin; tidak boleh dikirim');
     if (b.status !== 'available') throw conflict('Batch tidak tersedia untuk dikirim');
     if (b.tainted) throw conflict('Batch ditandai taint (turunan setoran yang ditolak); hubungi admin');
@@ -237,6 +242,7 @@ module.exports = function createDomain(store) {
       await anomaly('selisih_berat', variance > 2 * c.tolerancePct ? 'tinggi' : 'sedang', `Selisih berat ${variance}% (${t.sentKg} → ${kg} kg) ${from.name} → ${a.name}`, { actorId: a._id, batchId: b._id });
       await emit(ctx, { type: 'TRANSFER_DISPUTED', batch: b, actor: a, payload: { transferId: id, sentKg: t.sentKg, receivedKg: kg, variancePct: variance }, anchor: true });
       await notify({ toRole: 'admin', text: `Sengketa transfer ${t.code}: selisih ${variance}% (toleransi ${c.tolerancePct}%)`, link: '#/sengketa' });
+      if (hooks.dispute) { try { await hooks.dispute(t, variance, b); } catch (e) { console.error('hook sengketa:', e.message); } }
     } else await completeTransfer(ctx, t, b, a, kg, variance, 'received');
     return col.transfers.findOne({ _id: id });
   }
@@ -262,16 +268,30 @@ module.exports = function createDomain(store) {
   // ---------- gudang/penggilingan ----------
   async function ownBatch(ctx, id, roleReq) {
     const a = ctx.actor; if (!a || (roleReq && a.role !== roleReq)) throw forbid('Aksi tidak sesuai peran'); const b = await batchById(id);
-    if (b.ownerActorId !== a._id) throw forbid('Batch bukan milik Anda'); return [a, b];
+    if (b.ownerActorId !== a._id) throw forbid('Batch bukan milik Anda'); holdCheck(b); return [a, b];
   }
   async function storeBatch(ctx, id, d) { const [a, b] = await ownBatch(ctx, id, 'gudang'); if (b.status !== 'available') throw conflict('Batch tidak tersedia'); await emit(ctx, { type: 'STORED', batch: b, actor: a, payload: { location: d.location || 'Gudang utama', note: d.note || '' } }); return b; }
+  // Input = output utama + produk samping + susut + selisih belum terjelaskan. Rincian opsional; tanpa rincian status 'incomplete' (bukan pelanggaran).
+  function massBalance(inputKg, outKg, byp, shr, tolPct) {
+    const hasB = byp !== undefined && byp !== null && byp !== '', hasS = shr !== undefined && shr !== null && shr !== '';
+    const byproductKg = hasB ? +byp : null, shrinkKg = hasS ? +shr : null;
+    if ((hasB && !(byproductKg >= 0)) || (hasS && !(shrinkKg >= 0))) return { error: 'Produk samping dan susut harus angka >= 0' };
+    if (!hasB && !hasS) return { status: 'incomplete', byproductKg: null, shrinkKg: null, unexplainedKg: null, unexplainedPct: null };
+    const explained = outKg + (byproductKg || 0) + (shrinkKg || 0);
+    if (explained > inputKg * 1.0001) return { error: `Total output, produk samping, dan susut (${round(explained, 2)} kg) melebihi input ${inputKg} kg` };
+    const unexplainedKg = round(inputKg - explained, 2), unexplainedPct = round(unexplainedKg / inputKg * 100, 2);
+    return { status: unexplainedPct > tolPct ? 'review' : 'balanced', byproductKg, shrinkKg, unexplainedKg, unexplainedPct };
+  }
   async function processBatch(ctx, id, d) {
     const [a, b] = await ownBatch(ctx, id, 'gudang'); if (b.status !== 'available') throw conflict('Batch tidak tersedia'); if (b.commodity !== 'gabah') throw bad('Hanya gabah yang bisa digiling');
     const out = +d.outputKg; if (!(out > 0) || out > b.weightKg) throw bad('Berat beras tidak valid'); const yieldPct = round(out / b.weightKg * 100);
     const s = await seq('batch'); const c = await cfg();
-    const nb = await col.batches.insert({ code: `LP-BATCH-2026-${pad(s)}`, kind: 'processed', commodity: 'beras', weightKg: out, ownerActorId: a._id, status: 'available', parents: [{ batchId: b._id, weightKg: b.weightKg }], tainted: b.tainted, createdAt: now(), meta: { yieldPct, variety: d.variety || 'Pulen', selfReported: true } });
+    const mb = massBalance(b.weightKg, out, d.byproductKg, d.shrinkKg, c.massBalanceTolerancePct); if (mb.error) throw bad(mb.error);
+    const weightSource = d.weightSource === 'device' ? 'device' : 'manual';
+    const nb = await col.batches.insert({ code: `LP-BATCH-2026-${pad(s)}`, kind: 'processed', commodity: 'beras', weightKg: out, ownerActorId: a._id, status: 'available', parents: [{ batchId: b._id, weightKg: b.weightKg }], tainted: b.tainted, createdAt: now(), meta: { yieldPct, variety: d.variety || 'Pulen', selfReported: true, weightSource, mb } });
     await col.batches.update({ _id: b._id }, { status: 'processed' });
-    await emit(ctx, { type: 'PROCESSED', batch: nb, actor: a, payload: { inputKg: b.weightKg, outputKg: out, yieldPct, selfReported: true, fromBatch: b.code } });
+    await emit(ctx, { type: 'PROCESSED', batch: nb, actor: a, payload: { inputKg: b.weightKg, outputKg: out, yieldPct, selfReported: true, fromBatch: b.code, byproductKg: mb.byproductKg, shrinkKg: mb.shrinkKg, unexplainedKg: mb.unexplainedKg, balance: mb.status, weightSource } });
+    if (mb.status === 'review') await anomaly('neraca_massa', 'sedang', `Selisih neraca massa ${mb.unexplainedPct}% dari input (${a.name}, ${b.code}) belum terjelaskan`, { actorId: a._id, batchId: nb._id });
     if (yieldPct < c.yieldAlertPct) await anomaly('rendemen_rendah', 'tinggi', `Rendemen ${yieldPct}% di bawah batas ${c.yieldAlertPct}% (${a.name})`, { actorId: a._id, batchId: nb._id });
     return nb;
   }
@@ -323,5 +343,5 @@ module.exports = function createDomain(store) {
     return { batch: b, composition: await composition(b), parents: anc.filter((x) => x._id !== b._id).map((x) => ({ _id: x._id, code: x.code, kind: x.kind, weightKg: x.weightKg, status: x.status })), events, hasStored: events.some((e) => e.type === 'STORED' && e.batchId === b._id) };
   }
   const _ = { checkPassword, hashPassword };
-  return { col, cfg, seq, audit, notify, emit, processOutbox, integrity, anomaly, createGroup, rotateGroupCode, publicGroup, pengepulGroups, issueLabels, createDeposit, decideDeposit, mergeBatches, sendTransfer, confirmTransfer, resolveDispute, carrierStep, storeBatch, processBatch, packBatch, trace, batchDetail, composition, ancestors, batchById, eventHash, HttpError, bad, forbid, notFound, conflict, round, now, _ };
+  return { hooks, holdCheck, massBalance, col, cfg, seq, audit, notify, emit, processOutbox, integrity, anomaly, createGroup, rotateGroupCode, publicGroup, pengepulGroups, issueLabels, createDeposit, decideDeposit, mergeBatches, sendTransfer, confirmTransfer, resolveDispute, carrierStep, storeBatch, processBatch, packBatch, trace, batchDetail, composition, ancestors, batchById, eventHash, HttpError, bad, forbid, notFound, conflict, round, now, _ };
 };

@@ -51,6 +51,13 @@ const NAV = {
   superadmin: [['mode-tindak', 'Mode Tindak'], ['mode-lihat', 'Mode Lihat'], ['dashboard', 'Dashboard Pengawasan'], ['verifikasi', 'Antrean Verifikasi', 'pending'], ['pengguna', 'Pengguna'], ['pelaku', 'Pelaku & Kode Referral'], ['kelompok', 'Kelompok Tani'], ['sengketa', 'Sengketa Transfer', 'disputed'], ['tracelog', 'Trace Log'], ['anomali', 'Anomali'], ['tren', 'Tren Pasokan'], ['integritas', 'Integritas Blockchain'], ['konfigurasi', 'Konfigurasi'], ['audit', 'Audit Log']],
 };
 
+const ADD = {
+  admin: [['kasus', 'Kasus & Investigasi'], ['risiko', 'Papan Risiko'], ['neraca', 'Neraca Massa'], ['laporan', 'Laporan & Ekspor'], ['email', 'Pengiriman Email'], ['copilot', 'Asisten Analisis']],
+  pengawas: [['kasus', 'Kasus & Investigasi'], ['risiko', 'Papan Risiko'], ['neraca', 'Neraca Massa'], ['laporan', 'Laporan & Ekspor'], ['copilot', 'Asisten Analisis']],
+  superadmin: [['kasus', 'Kasus & Investigasi'], ['risiko', 'Papan Risiko'], ['neraca', 'Neraca Massa'], ['laporan', 'Laporan & Ekspor'], ['email', 'Pengiriman Email'], ['copilot', 'Asisten Analisis']],
+  gudang: [['neraca', 'Neraca Massa'], ['laporan', 'Laporan']],
+};
+for (const [k, v] of Object.entries(ADD)) NAV[k].push(...v);
 for (const k of Object.keys(NAV)) NAV[k].push(['profil', 'Profil & Keamanan']);
 
 // ---------- sesi ----------

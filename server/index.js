@@ -7,7 +7,7 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; cha
 async function start({ port = +process.env.PORT || 3000, dataDir = DATA, seed = true } = {}) {
   const store = await openStore(dataDir); const D = createDomain(store); const A = createAnalytics(D); A.storeKind = store.kind;
   if (seed && (await store.isEmpty())) { await require('./seed')(D); console.log('Data simulasi dimuat.'); }
-  D.prov = require('./provenance')(D); const routes = buildRoutes(D, A);
+  D.prov = require('./provenance')(D); D.ops = require('./ops')(D); D.copilot = require('./copilot')(D, A); const routes = buildRoutes(D, A);
   const signDeep = (v) => (typeof v === 'string' ? (v.startsWith('/uploads/') && !v.includes('?') ? auth.signUrl(v) : v) : Array.isArray(v) ? v.map(signDeep) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, signDeep(x)])) : v); const apiLimiter = sec.createLimiter({ max: +process.env.RATE_LIMIT_PER_MIN || 600, windowMs: 60000 }); const TRUST = process.env.TRUST_PROXY === '1';
   const clientIp = (req) => (TRUST && String(req.headers['x-forwarded-for'] || '').split(',')[0].trim()) || req.socket.remoteAddress || '?';
   const send = (res, code, body, headers = {}) => { const b = typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body); res.writeHead(code, { 'content-type': typeof body === 'object' && !Buffer.isBuffer(body) ? 'application/json; charset=utf-8' : 'text/plain', ...headers }); res.end(b); };
@@ -34,7 +34,7 @@ async function start({ port = +process.env.PORT || 3000, dataDir = DATA, seed = 
         for (const r of routes) {
           if (r.method !== req.method) continue; const m = r.re.exec(p); if (!m) continue;
           const ctx = r.public ? {} : await buildCtx(req); ctx.ip = ip; ctx.params = m.groups || {}; ctx.query = u.query; ctx.body = req.method === 'GET' || req.method === 'DELETE' ? {} : await readBody(req);
-          const out = (await r.fn(ctx)) ?? { ok: true }; return send(res, 200, r.public ? out : signDeep(out));
+          const out = (await r.fn(ctx)) ?? { ok: true }; if (out && out.__csv) return send(res, 200, out.__csv.csv, { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="${out.__csv.filename}"` }); return send(res, 200, r.public ? out : signDeep(out));
         }
         return send(res, 404, { error: 'Endpoint tidak ditemukan' });
       }
@@ -50,7 +50,7 @@ async function start({ port = +process.env.PORT || 3000, dataDir = DATA, seed = 
     }
   });
   await new Promise((r) => server.listen(port, r));
-  const timer = setInterval(() => D.processOutbox().catch(() => {}), 30000); timer.unref();
+  const timer = setInterval(() => { D.processOutbox().catch(() => {}); D.ops.processEmails().catch(() => {}); }, 30000); timer.unref();
   console.log(`LestariPangan berjalan di http://localhost:${server.address().port}  · data: ${store.kind}`);
   return { server, D, store, close: () => new Promise((r) => { clearInterval(timer); store.flush(); server.close(r); }) };
 }
