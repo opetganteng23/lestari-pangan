@@ -25,6 +25,14 @@ module.exports = function ({ D, add, need, ACTOR_ROLES, bad, notFound }) {
   add('GET', '/api/exports', async (c) => { need(c, [...STAFF, 'gudang', 'kelompok_tani']); const list = Object.entries(O.EXPORTS).filter(([, e]) => e.roles.includes(c.role) || c.role === 'superadmin').map(([k, e]) => ({ kind: k, title: e.title })); return { kinds: list, formats: ['csv'], note: 'CSV dibuka langsung di Excel. Untuk PDF gunakan tombol Cetak pada halaman laporan. XLSX/PDF asli belum tersedia.' }; });
   add('GET', '/api/exports/log', async (c) => { need(c, STAFF); return D.col.exportsLog.find({}, { sort: { at: -1 }, limit: 100 }); });
   add('GET', '/api/exports/:kind', async (c) => { need(c, [...STAFF, 'gudang', 'kelompok_tani']); return { __csv: await O.exportCsv(c, c.params.kind, c.query) }; });
+  // Prediksi & Digital Twin (proyeksi/simulasi, bukan fakta)
+  add('GET', '/api/predict/readiness', async (c) => { need(c, STAFF); return D.predict.readiness(c.query.scope || 'total'); });
+  add('GET', '/api/predict/forecast', async (c) => { need(c, STAFF); return D.predict.forecast(c.query.scope || 'total', { preview: c.query.preview === '1', horizon: Math.min(12, Math.max(1, +c.query.horizon || 4)) }); });
+  add('GET', '/api/predict/monitor', async (c) => { need(c, STAFF); return D.predict.monitor(c.query.scope || 'total'); });
+  add('GET', '/api/predict/districts', async (c) => { need(c, STAFF); return [...new Set((await D.col.farmerGroups.find({})).map((g) => g.district))]; });
+  add('GET', '/api/twin/network', async (c) => { need(c, STAFF); return D.predict.network(+c.query.windowDays || 90); });
+  add('POST', '/api/twin/simulate', async (c) => { need(c, STAFF); return D.predict.simulate(c, c.body.scenario, c.body); });
+  add('GET', '/api/twin/simulations', async (c) => { need(c, STAFF); return D.col.simulations.find({}, { sort: { at: -1 }, limit: 50 }); });
   // AI Copilot (baca-saja)
   add('POST', '/api/ai/copilot/query', async (c) => { need(c, STAFF); if (!aiLimiter.hit(c.user._id)) throw new D.HttpError(429, 'Terlalu banyak pertanyaan AI, coba lagi sebentar'); return D.copilot.query(c, c.body.question); });
   add('GET', '/api/ai/logs', async (c) => { need(c, ['admin']); return D.col.aiLogs.find({}, { sort: { at: -1 }, limit: 100 }); });

@@ -53,9 +53,9 @@ const NAV = {
 
 NAV.kelompok_tani = [['portal', 'Beranda Kelompok'], ['laporan', 'Laporan']];
 const ADD = {
-  admin: [['integrasi', 'Integrasi & API'], ['kasus', 'Kasus & Investigasi'], ['risiko', 'Papan Risiko'], ['neraca', 'Neraca Massa'], ['laporan', 'Laporan & Ekspor'], ['email', 'Pengiriman Email'], ['copilot', 'Asisten Analisis']],
-  pengawas: [['kasus', 'Kasus & Investigasi'], ['risiko', 'Papan Risiko'], ['neraca', 'Neraca Massa'], ['laporan', 'Laporan & Ekspor'], ['copilot', 'Asisten Analisis']],
-  superadmin: [['integrasi', 'Integrasi & API'], ['kasus', 'Kasus & Investigasi'], ['risiko', 'Papan Risiko'], ['neraca', 'Neraca Massa'], ['laporan', 'Laporan & Ekspor'], ['email', 'Pengiriman Email'], ['copilot', 'Asisten Analisis']],
+  admin: [['prediksi', 'Prediksi & Simulasi'], ['integrasi', 'Integrasi & API'], ['kasus', 'Kasus & Investigasi'], ['risiko', 'Papan Risiko'], ['neraca', 'Neraca Massa'], ['laporan', 'Laporan & Ekspor'], ['email', 'Pengiriman Email'], ['copilot', 'Asisten Analisis']],
+  pengawas: [['prediksi', 'Prediksi & Simulasi'], ['kasus', 'Kasus & Investigasi'], ['risiko', 'Papan Risiko'], ['neraca', 'Neraca Massa'], ['laporan', 'Laporan & Ekspor'], ['copilot', 'Asisten Analisis']],
+  superadmin: [['prediksi', 'Prediksi & Simulasi'], ['integrasi', 'Integrasi & API'], ['kasus', 'Kasus & Investigasi'], ['risiko', 'Papan Risiko'], ['neraca', 'Neraca Massa'], ['laporan', 'Laporan & Ekspor'], ['email', 'Pengiriman Email'], ['copilot', 'Asisten Analisis']],
   gudang: [['neraca', 'Neraca Massa'], ['laporan', 'Laporan']],
 };
 for (const [k, v] of Object.entries(ADD)) NAV[k].push(...v);

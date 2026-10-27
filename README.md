@@ -18,6 +18,7 @@ Cek kesehatan: `GET /api/health`.
 | sa@lestari.id | Super admin (Mode Lihat + Mode Tindak) |
 | admin@lestari.id | Admin teknis |
 | pengawas@lestari.id | Pengawas (baca-saja) |
+| kelompok.sumber@lestari.id · kelompok.harapan@ | Kelompok tani (portal) |
 | pengepul1@lestari.id · pengepul2 · pengepul3 | Pengepul |
 | gudang1@lestari.id · gudang2 | Gudang/penggilingan |
 | distributor@ · logistik@ · retailer@lestari.id | Distributor, logistik, retailer |
@@ -36,6 +37,10 @@ lestari-pangan/
 │  ├─ ledger/              adapter ledger: index.js (pemilih), local.js (simulasi), evm.js (belum diuji)
 │  ├─ provenance.js        lineage, verifikasi integritas, Digital Product Passport
 │  ├─ security.js          pembatas laju, validasi, header keamanan
+│  ├─ ops.js · copilot.js  kasus/recall, neraca massa, ekspor, email · AI Copilot baca-saja
+│  ├─ predict.js           forecasting, pemantauan model, Digital Twin
+│  ├─ routes-ops.js · routes-partner.js   rute fase 3–5 (kasus, portal petani, API mitra)
+│  ├─ mailer.js            pengirim email (SMTP, belum diuji)
 │  ├─ analytics.js         metrik + ringkasan
 │  ├─ store.js             penyimpanan JSON / MongoDB
 │  ├─ auth.js · qr.js · seed.js · paths.js
@@ -47,10 +52,14 @@ lestari-pangan/
 │  ├─ js/core.js           util, API, sesi, layout, menu per peran
 │  ├─ js/screens-actor.js  layar pelaku rantai pasok + detail batch
 │  ├─ js/screens-admin.js  layar admin, pengawas, super admin, pengguna
+│  ├─ js/screens-ops.js    kasus, risiko, neraca massa, laporan, email, asisten analisis
+│  ├─ js/screens-farmer.js portal kelompok tani, integrasi API
+│  ├─ js/screens-predict.js prediksi & digital twin
+│  ├─ js/offline.js · sw.js antrean offline & service worker
 │  └─ assets/fonts · img
 ├─ contracts/LPAnchor.sol  kontrak anchor (belum diaudit/dideploy)
 ├─ scripts/                backup & restore data
-├─ test/                   unit.js · ledger.js · smoke.js
+├─ test/                   unit · ledger · smoke · ops · partner · predict · ui-render
 ├─ docs/mts.md             MTS v0.3 (spesifikasi target)
 ├─ docs/mts-v0.2-baseline.md  baseline sesuai kode saat ini
 ├─ docs/fitur-per-peran.md
@@ -58,7 +67,7 @@ lestari-pangan/
 ```
 
 ## Dokumen
-- [MTS v0.3 (target)](docs/mts.md) · [Baseline v0.2 (sesuai kode)](docs/mts-v0.2-baseline.md) · [Fitur per peran](docs/fitur-per-peran.md)
+- [Status implementasi vs v0.3](docs/gap-v0.3.md) · [Panduan pilot](docs/pilot.md) · [MTS v0.3 (target)](docs/mts.md) · [Baseline v0.2 (sesuai kode)](docs/mts-v0.2-baseline.md) · [Fitur per peran](docs/fitur-per-peran.md)
 
 ## Konfigurasi opsional (variabel lingkungan)
 - `PORT` (3000) · `APP_SECRET` · `LP_DATA_DIR`
@@ -66,6 +75,8 @@ lestari-pangan/
 - `ANTHROPIC_API_KEY` (+ opsional `ANTHROPIC_MODEL`) — ringkasan pengawas ditarasikan Claude; angka tetap dihitung kode. Tanpa kunci: narasi berbasis aturan (diberi label). Belum diuji dengan API asli.
 - `LOGIN_MAX_FAILS` (5) · `LOGIN_LOCK_MIN` (15) · `RATE_LIMIT_PER_MIN` (600) · `TRUST_PROXY=1` (percaya `X-Forwarded-For` di balik proxy) · `LOG=0` (matikan log permintaan)
 - `LEDGER_ADAPTER` (`local` bawaan | `evm`, belum diuji; butuh `npm i ethers` + `EVM_RPC_URL`, `EVM_PRIVATE_KEY`, `EVM_CONTRACT_ADDRESS`; kontrak di `contracts/LPAnchor.sol`)
+- `SMTP_HOST` `SMTP_PORT` `SMTP_USER` `SMTP_PASS` `SMTP_FROM` `SMTP_SECURE` (+ `npm i nodemailer`, notifierMode `smtp`) — email; belum diuji dengan server nyata
+- `RATE_LIMIT_PER_MIN` · `PARTNER_RATE_PER_MIN` · `AI_RATE_PER_MIN`
 - `DEMO_MODE=0` — matikan alat demo "ubah data event".
 - Notifikasi: mode manual (pemberitahuan dalam aplikasi). Mode SMTP baru menandai antrean; pengiriman email nyata belum diimplementasikan.
 

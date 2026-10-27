@@ -1,0 +1,52 @@
+// Layar Fase 5: Prediksi (proyeksi volume setoran, kesiapan data, pemantauan model) dan Digital Twin (simulasi hipotetis)
+function lineChart(hist, fc) {
+  const W = 640, H = 220, P = 34, pts = [...hist.map((h) => ({ w: h.weekStart, v: h.kg })), ...fc.map((f) => ({ w: f.weekStart, v: f.yhat, lo: f.lo, hi: f.hi }))]; if (pts.length < 2) return '';
+  const mx = Math.max(1, ...pts.map((p) => p.hi ?? p.v)) * 1.08, X = (i) => P + i / (pts.length - 1) * (W - P - 10), Y = (v) => H - 24 - v / mx * (H - 44);
+  const n = hist.length; const line = hist.map((h, i) => `${i ? 'L' : 'M'}${X(i).toFixed(1)},${Y(h.kg).toFixed(1)}`).join('');
+  const fl = [{ v: hist[n - 1].kg }, ...fc.map((f) => ({ v: f.yhat }))].map((p, i) => `${i ? 'L' : 'M'}${X(n - 1 + i).toFixed(1)},${Y(p.v).toFixed(1)}`).join('');
+  const band = fc.map((f, i) => `${X(n + i).toFixed(1)},${Y(f.hi).toFixed(1)}`).join(' ') + ' ' + fc.slice().reverse().map((f, i) => `${X(n + fc.length - 1 - i).toFixed(1)},${Y(f.lo).toFixed(1)}`).join(' ');
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto" role="img" aria-label="Riwayat dan proyeksi volume setoran mingguan"><line x1="${P}" y1="${H - 24}" x2="${W - 10}" y2="${H - 24}" stroke="#D3DDD6"/><text x="4" y="14" font-size="10" fill="#5F7066">${Math.round(mx).toLocaleString('id-ID')} kg</text>
+  <polygon points="${band}" fill="#F2B21B" opacity=".25"/><path d="${line}" fill="none" stroke="#237A41" stroke-width="2"/><path d="${fl}" fill="none" stroke="#9A6212" stroke-width="2" stroke-dasharray="5 4"/>
+  <text x="${P}" y="${H - 6}" font-size="10" fill="#5F7066">${esc(pts[0].w)}</text><text x="${W - 70}" y="${H - 6}" font-size="10" fill="#5F7066">${esc(pts[pts.length - 1].w)}</text></svg>
+  <div class="legend"><span><i style="background:#237A41"></i>Riwayat (fakta tercatat)</span><span><i style="background:#9A6212"></i>Proyeksi</span><span><i style="background:#F2B21B"></i>Rentang 80%</span></div>`;
+}
+
+S.prediksi = async (m) => {
+  const f = ss.get('lp_pf') || { tab: 'proyeksi', scope: 'total' }; const save = (p) => { ss.set('lp_pf', { ...f, ...p }); reload(); };
+  const tabs = [['proyeksi', 'Proyeksi'], ['monitor', 'Pemantauan model'], ['twin', 'Digital Twin']];
+  const head = `<div class="tabs">${tabs.map(([k, l]) => `<button data-tab="${k}" class="${f.tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+  m.innerHTML = head + '<div id="pt"><div class="empty">Memuat…</div></div>'; m.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => save({ tab: b.dataset.tab })));
+  const el = $('#pt');
+  if (f.tab === 'proyeksi') {
+    const ds = await api('/api/predict/districts'); const q = '?scope=' + encodeURIComponent(f.scope) + (f.preview ? '&preview=1' : ''); const r = await api('/api/predict/forecast' + q); const rd = r.readiness || (await api('/api/predict/readiness?scope=' + encodeURIComponent(f.scope)));
+    const scopeSel = `<select class="inp" id="sc" style="width:auto"><option value="total">Seluruh jaringan</option>${ds.map((d) => `<option value="district:${esc(d)}" ${f.scope === 'district:' + d ? 'selected' : ''}>${esc(d)}</option>`).join('')}</select>`;
+    el.innerHTML = `<div class="card"><div class="row" style="align-items:center"><h2 style="margin:0">Kesiapan data ${rd.ready ? chip('verified', 'Memenuhi syarat') : chip('rejected', 'Belum memadai')}</h2><div class="btns" style="flex:none">${scopeSel}</div></div>
+    <div class="checks" style="margin-top:10px">${rd.checks.map((c) => `<div><span class="ck ${c.ok ? '' : 'no'}">${c.ok ? '✓' : '!'}</span>${esc(c.text)}</div>`).join('')}</div><p class="small" style="margin-top:8px">${esc(rd.note)}</p></div>
+    <div class="card" style="margin-top:16px"><h2>Proyeksi volume setoran mingguan <span class="chip gray">PROYEKSI, bukan fakta</span></h2>${r.usable ? `${r.preview ? '<div class="ban" style="border-radius:10px;margin-bottom:10px">PRATINJAU: data belum memenuhi syarat. Jangan dipakai untuk keputusan.</div>' : ''}${lineChart(r.history, r.forecast)}
+    <div class="tw"><table><tr><th>Minggu mulai</th><th>Proyeksi</th><th>Rentang 80%</th></tr>${r.forecast.map((p) => `<tr><td>${esc(p.weekStart)}</td><td><b>${kg(p.yhat)}</b></td><td>${kg(p.lo)} – ${kg(p.hi)}</td></tr>`).join('')}</table></div>
+    <h3>Evaluasi model</h3><p class="small">Model dipakai: <b>${esc(r.model)}</b>. ${esc(r.modelNote)}</p><div class="tw"><table><tr><th>Model</th><th>Galat uji (MAE, kg/minggu)</th><th>MAPE %</th></tr>${Object.entries(r.evaluation.test).map(([k, v]) => `<tr><td>${esc(k)}${k === r.model ? ' ✓' : ''}${k === 'naif' ? ' <span class="small">(baseline)</span>' : ''}</td><td>${v.mae.toLocaleString('id-ID')}</td><td>${v.mape == null ? '-' : v.mape}</td></tr>`).join('')}</table></div>
+    <p class="small">${esc(r.evaluation.method)} Minggu uji: ${r.evaluation.testWeeks} dari ${r.evaluation.weeksTotal}. Interval: ${esc(r.interval)}</p><h3>Keterbatasan</h3><ul style="margin-left:18px">${r.limitations.map((x) => `<li class="small">${esc(x)}</li>`).join('')}</ul>`
+      : `<div class="empty">${esc(r.message)}</div><div class="btns" style="justify-content:center"><button class="btn sm" id="pv">Lihat pratinjau (bukan untuk keputusan)</button></div>`}</div>`;
+    $('#sc').onchange = (e) => save({ scope: e.target.value }); const pv = $('#pv'); if (pv) pv.onclick = () => save({ preview: true });
+    if (f.preview && !r.usable) save({ preview: false });
+  } else if (f.tab === 'monitor') {
+    const r = await api('/api/predict/monitor');
+    el.innerHTML = `<div class="card"><h2>Pemantauan kualitas model</h2><p class="small">${esc(r.note)}</p><div class="grid g4" style="margin:12px 0">${kpi('Status', esc(r.status), '', r.drift ? 'var(--red)' : 'var(--g700)')}${kpi('Galat nyata (MAE)', r.mae == null ? '-' : kg(r.mae), r.referenceTestMae == null ? '' : 'galat uji ' + kg(r.referenceTestMae))}${kpi('Cakupan rentang 80%', r.intervalCoverage == null ? '-' : r.intervalCoverage + '%', 'target sekitar 80%')}${kpi('Perbandingan', r.comparisons, r.runs + ' proyeksi tersimpan')}</div>
+    ${r.rows.length ? `<div class="tw"><table><tr><th>Minggu</th><th>Proyeksi</th><th>Rentang</th><th>Aktual</th><th>Galat</th><th>Dalam rentang</th></tr>${r.rows.map((x) => `<tr><td>${esc(x.weekStart)}</td><td>${kg(x.yhat)}</td><td>${kg(x.lo)} – ${kg(x.hi)}</td><td>${kg(x.actual)}</td><td>${kg(x.err)}</td><td>${x.inInterval ? 'ya' : 'tidak'}</td></tr>`).join('')}</table></div>` : '<div class="empty">Belum ada minggu proyeksi yang sudah lewat. Proyeksi disimpan otomatis saat dibuka; bandingkan lagi setelah minggunya berlalu.</div>'}</div>`;
+  } else {
+    const net = await api('/api/twin/network'); const nodes = net.nodes.filter((n) => n.role !== 'kelompok_tani'); const srcs = net.nodes.filter((n) => n.role === 'kelompok_tani' || n.role === 'pengepul'); const trs = net.edges.filter((e) => e.kind === 'transfer'); const nm = Object.fromEntries(net.nodes.map((n) => [n.id, n.name]));
+    el.innerHTML = `<div class="card"><h2>Jaringan pasokan <span class="chip gray">dari data tercatat</span></h2><p class="small">${esc(net.sourceNote)}</p>
+    <h3>Ketergantungan satu sumber (≥ 60% pasokan masuk)</h3>${net.singleSource.length ? net.singleSource.map((x) => `<div class="small" style="padding:4px 0">${esc(x.node)} (${esc(ROLE[x.role] || x.role)}) bergantung ${x.sharePct}% pada ${esc(x.mainSource)}</div>`).join('') : '<div class="small">Tidak ada.</div>'}
+    <div class="tw" style="margin-top:10px"><table><tr><th>Pelaku</th><th>Peran</th><th>Masuk</th><th>Keluar</th></tr>${net.nodes.map((n) => `<tr><td>${esc(n.name)}</td><td>${esc(ROLE[n.role] || n.role)}</td><td>${kg(n.inKg)}</td><td>${kg(n.outKg)}</td></tr>`).join('')}</table></div></div>
+    <div class="card" style="margin-top:16px"><h2>Simulasi skenario <span class="chip wait">HIPOTETIS</span></h2><p class="small">Menjawab "bagaimana jika", bukan meramal. Setiap hasil menampilkan asumsi, parameter, dan sumber data.</p>
+    <form id="sf"><div class="row"><div>${fld('scenario', 'Skenario', { type: 'select', options: '<option value="node_down">Pelaku berhenti beroperasi</option><option value="supply_drop">Pasokan dari sumber turun</option><option value="delay">Keterlambatan rute transfer</option><option value="capacity">Perubahan kapasitas pelaku</option>' })}</div><div id="sp"></div></div><div class="btns" style="margin-top:12px"><button class="btn pri">Jalankan simulasi</button></div></form><div id="sr" style="margin-top:14px"></div></div>`;
+    const sel = (name, label, list) => fld(name, label, { type: 'select', options: opts(list, 'id', (n) => `${n.name} (${ROLE[n.role] || n.role})`) });
+    const draw = () => { const s = $('[name=scenario]').value; $('#sp').innerHTML = s === 'node_down' ? sel('nodeId', 'Pelaku', nodes) + fld('days', 'Lama berhenti (hari)', { type: 'number', value: 7, min: 1 }) + fld('altCapacityPct', 'Kemampuan pelaku sejenis menyerap (%)', { type: 'number', value: 20, min: 0 })
+      : s === 'supply_drop' ? sel('sourceId', 'Sumber', srcs) + fld('dropPct', 'Penurunan pasokan (%)', { type: 'number', value: 30, min: 1 }) + fld('weeks', 'Lama (minggu)', { type: 'number', value: 4, min: 1 })
+        : s === 'delay' ? fld('route', 'Rute transfer', { type: 'select', options: trs.map((e) => `<option value="${esc(e.from)}|${esc(e.to)}">${esc(nm[e.from])} → ${esc(nm[e.to])}</option>`).join('') }) + fld('extraHours', 'Tambahan waktu (jam)', { type: 'number', value: 24, min: 1 })
+          : sel('nodeId', 'Pelaku', nodes) + fld('capacityPct', 'Kapasitas (% dari volume historis)', { type: 'number', value: 50, min: 0 }); };
+    $('[name=scenario]').onchange = draw; draw();
+    $('#sf').onsubmit = guard(async (e) => { e.preventDefault(); const fd = Object.fromEntries(new FormData(e.target)); if (fd.route) { [fd.fromId, fd.toId] = fd.route.split('|'); delete fd.route; } const r = await api('/api/twin/simulate', { method: 'POST', body: fd });
+      $('#sr').innerHTML = `<div class="ai"><h2>${esc(r.label)}</h2><h3>Parameter</h3><div class="small">${Object.entries(r.parameters).map(([k, v]) => `${esc(k)}: <b>${esc(v)}</b>`).join(' · ')}</div><h3>Hasil</h3><pre class="mono" style="white-space:pre-wrap;font-size:12px">${esc(JSON.stringify(r.result, null, 2))}</pre><h3>Asumsi</h3><ul style="margin-left:18px">${r.assumptions.map((a) => `<li class="small">${esc(a)}</li>`).join('')}</ul><p class="small">Sumber: ${esc(r.sourceData.note)}</p></div>`; });
+  }
+};
