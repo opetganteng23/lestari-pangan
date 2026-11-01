@@ -10,7 +10,7 @@ async function start({ port = +process.env.PORT || 3000, dataDir = DATA, seed = 
   if (seed && (await store.isEmpty())) {
     if (process.env.SEED_DEMO === '0') { // produksi: hanya satu akun super admin dari ADMIN_EMAIL / ADMIN_PASSWORD
       const em = String(process.env.ADMIN_EMAIL || '').toLowerCase().trim(), pw = String(process.env.ADMIN_PASSWORD || '');
-      const issue = sec.passwordIssue(pw); if (!/^[^s@]+@[^s@]+.[^s@]+$/.test(em) || issue) throw new Error('SEED_DEMO=0 butuh ADMIN_EMAIL valid dan ADMIN_PASSWORD kuat (' + (issue || 'email tidak valid') + ')');
+      const issue = sec.passwordIssue(pw); if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em) || issue) throw new Error('SEED_DEMO=0 butuh ADMIN_EMAIL valid dan ADMIN_PASSWORD kuat (' + (issue || 'email tidak valid') + ')');
       await D.cfg(); await D.col.users.insert({ email: em, name: process.env.ADMIN_NAME || 'Super Admin', role: 'superadmin', actorId: null, passwordHash: auth.hashPassword(pw), active: true }); console.log('Data kosong; akun super admin dibuat dari ADMIN_EMAIL.');
     } else { await require('./seed')(D); console.log('Data simulasi dimuat.'); }
   }

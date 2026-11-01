@@ -10,7 +10,7 @@ function Get-EnvValue([string]$Name, [string]$Default = '') {
 function Test-Listening([int]$Port) { [bool](Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue) }
 function Get-SshTunnelProcs { Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -match 'lestari-tunnel' } }
 function Get-CfProcs { Get-CimInstance Win32_Process -Filter "Name='cloudflared.exe'" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -match [regex]::Escape($script:CfMetrics) } }
-function Get-TailscaleExe { $g = Get-Command tailscale -ErrorAction SilentlyContinue; if ($g) { return $g.Source }; $p = 'C:Program FilesTailscale	ailscale.exe'; if (Test-Path $p) { return $p }; return $null }
+function Get-TailscaleExe { $g = Get-Command tailscale -ErrorAction SilentlyContinue; if ($g) { return $g.Source }; $p = 'C:\Program Files\Tailscale\tailscale.exe'; if (Test-Path $p) { return $p }; return $null }
 function Get-TunnelMode { (Get-EnvValue 'LP_TUNNEL' 'none').ToLower() }
 function Test-TunnelUp {
   switch (Get-TunnelMode) {
