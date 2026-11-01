@@ -207,6 +207,6 @@ module.exports = function build(D, A) {
 
   // ----- QR -----
   add('GET', '/api/qr', async (c) => ({ svg: qr.svg(c.query.text || '') }), { public: true });
-  const rc = { D, add, need, ACTOR_ROLES, bad, notFound, forbid, conflict, sec, auth, names, pubUser }; require('./routes-ops')(rc); require('./routes-partner')(rc); require('./routes-server')(rc);
+  const rc = { D, add, need, ACTOR_ROLES, bad, notFound, forbid, conflict, sec, auth, names, pubUser }; require('./routes-ops')(rc); require('./routes-partner')(rc); require('./routes-server')(rc); require('./routes-auth')(rc);
   return R;
 };

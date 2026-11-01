@@ -14,10 +14,12 @@ S.profil = async (m) => {
     <p class="small" style="margin-top:8px">Minimal 8 karakter, memuat huruf dan angka. Sesi di perangkat lain akan berakhir.</p>
     <div class="btns" style="margin-top:14px"><button class="btn pri">Simpan kata sandi</button></div></form></div></div>`;
   $('#pw').onsubmit = guard(async (e) => {
+    e.preventDefault();
+    if (!(await askConfirm('Sesi di perangkat lain akan berakhir dan Anda harus masuk lagi di sana.', { title: 'Ganti kata sandi?', confirm: 'Ya, ganti', danger: false }))) return;
     e.preventDefault(); const f = Object.fromEntries(new FormData(e.target));
     if (f.next !== f.again) throw new Error('Ulangi kata sandi baru dengan sama persis');
     const r = await api('/api/me/password', { method: 'POST', body: { current: f.current, next: f.next } });
     sd('lp_token', r.token); e.target.reset(); toast('Kata sandi diganti');
   });
-  $('#lo').onclick = guard(async () => { if (confirm('Keluar dari semua perangkat?')) { await api('/api/logout', { method: 'POST' }); logout(true); } });
+  $('#lo').onclick = guard(async () => { if (await askConfirm('Semua sesi akun ini di semua perangkat akan berakhir, termasuk yang sedang Anda pakai.', { title: 'Keluar dari semua perangkat?', confirm: 'Ya, keluar semua' })) { await api('/api/logout', { method: 'POST' }); logout(true); } });
 };

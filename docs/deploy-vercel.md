@@ -3,6 +3,7 @@
 ```
 Browser ──HTTPS──> Vercel (situs statis dari public/)
                      ├─ /            file statis
+                     ├─ /app         → app.html (aplikasi)
                      ├─ /t/KODE      → trace.html (halaman konsumen)
                      └─ /api  /uploads  /qr   (rewrite eksternal)
                               │  HTTPS

@@ -12,7 +12,7 @@ const round = (n, d = 1) => Math.round(n * 10 ** d) / 10 ** d;
 
 module.exports = function createDomain(store) {
   const C = (n) => store.col(n);
-  const col = Object.fromEntries(['users', 'actors', 'referralCodes', 'farmerGroups', 'qrLabels', 'deposits', 'batches', 'transfers', 'events', 'outbox', 'anomalies', 'notifications', 'auditLogs', 'appConfig', 'counters', 'analyticsReports', 'scans', 'cases', 'corrections', 'emails', 'exportsLog', 'aiLogs', 'apiKeys', 'idem', 'deviceReadings', 'forecastRuns', 'simulations'].map((n) => [n, C(n)]));
+  const col = Object.fromEntries(['users', 'actors', 'referralCodes', 'farmerGroups', 'qrLabels', 'deposits', 'batches', 'transfers', 'events', 'outbox', 'anomalies', 'notifications', 'auditLogs', 'appConfig', 'counters', 'analyticsReports', 'scans', 'cases', 'corrections', 'emails', 'exportsLog', 'aiLogs', 'apiKeys', 'idem', 'deviceReadings', 'forecastRuns', 'simulations', 'resets'].map((n) => [n, C(n)]));
 
   const DEFAULT_CFG = { _id: 'cfg', tolerancePct: 2, depositSlaHours: 24, samplingRate: 30, qrQuotaPerPeriod: 200, yieldAlertPct: 55, hangingHours: 48, scanAlertPerDay: 100, massBalanceTolerancePct: 3, forecastMinWeeks: 12, notifierMode: 'manual' };
   async function cfg() { let c = await col.appConfig.findOne({ _id: 'cfg' }); if (!c) c = await col.appConfig.insert({ ...DEFAULT_CFG }); return c; }

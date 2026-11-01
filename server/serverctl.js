@@ -6,7 +6,7 @@ const backup = require('./backup');
 const WINDOW = /^([01]\d|2[0-3]):([0-5]\d)-([01]\d|2[0-3]):([0-5]\d)$/;
 const DEFAULT = { enabled: true, message: '', window: '', aiEnabled: true, aiDailyLimit: 0 };
 const STAFF = ['admin', 'superadmin', 'pengawas'];
-const EXEMPT = [/^\/api\/login$/, /^\/api\/logout$/, /^\/api\/me\/password$/, /^\/api\/notifications\/read$/, /^\/api\/server\//];
+const EXEMPT = [/^\/api\/password\//,/^\/api\/login$/, /^\/api\/logout$/, /^\/api\/me\/password$/, /^\/api\/notifications\/read$/, /^\/api\/server\//];
 
 module.exports = function createServerCtl(D, store) {
   const { col, bad } = D; const started = Date.now();

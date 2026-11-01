@@ -1,2 +1,178 @@
-<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>LestariPangan · Traceability Pangan</title><link rel="icon" href="/assets/img/emblem.png"><link rel="stylesheet" href="/css/app.css"></head>
-<body><div id="root"></div><script src="/js/core.js"></script><script src="/js/screens-actor.js"></script><script src="/js/screens-admin.js"></script><script src="/js/screens-ops.js"></script><script src="/js/screens-server.js"></script><script src="/js/screens-farmer.js"></script><script src="/js/screens-predict.js"></script><script src="/js/offline.js"></script><script src="/js/screens-common.js"></script><script>boot()</script></body></html>
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LestariPangan · Telusuri pangan dari sawah sampai meja makan</title>
+<meta name="description" content="LestariPangan mencatat perjalanan gabah dan beras dari kelompok tani sampai konsumen, lengkap dengan verifikasi, konfirmasi dua pihak, dan jejak yang tidak bisa diubah diam-diam. Prototipe dengan data simulasi.">
+<meta name="theme-color" content="#12472A">
+<link rel="preload" href="/assets/fonts/Poppins-Regular.ttf" as="font" type="font/ttf" crossorigin><link rel="preload" href="/assets/fonts/Poppins-Medium.ttf" as="font" type="font/ttf" crossorigin><link rel="preload" href="/assets/fonts/Poppins-Bold.ttf" as="font" type="font/ttf" crossorigin><link rel="icon" href="/assets/img/emblem.png">
+<link rel="stylesheet" href="/css/app.css">
+<link rel="stylesheet" href="/css/landing.css">
+</head>
+<body>
+<div id="landing">
+<a class="skip" href="#isi">Lewati ke konten</a>
+<div class="scrollbar" aria-hidden="true"><i id="sb"></i></div>
+
+<header class="topnav" id="nav">
+  <a class="logo" href="#top" aria-label="LestariPangan, ke atas"><img src="/assets/img/emblem.png" alt=""><b>Lestari<span>Pangan</span></b></a>
+  <nav class="links" id="links" aria-label="Menu utama">
+    <a href="#alur">Alur</a><a href="#peran">Peran</a><a href="#bukti">Bukti</a><a href="#konsumen">Konsumen</a><a href="#tanya">Tanya jawab</a>
+  </nav>
+  <div class="cta"><a class="btn" href="/app#/masuk">Masuk</a><a class="btn pri" href="/app#/daftar">Daftar</a></div>
+  <button class="burger" id="burger" aria-label="Buka menu" aria-expanded="false"><i></i><i></i><i></i></button>
+</header>
+
+<main id="isi">
+<!-- ================= HERO ================= -->
+<section class="hero" id="top">
+  <div class="grains" aria-hidden="true"></div>
+  <div class="wrap hero-grid">
+    <div class="hero-copy">
+      <span class="pill rv"><i class="dot"></i> Prototipe · semua data adalah simulasi</span>
+      <h1 class="rv" style="--d:.08s">Dari panen sampai meja makan, <span class="hl">setiap langkah tercatat.</span></h1>
+      <p class="lead rv" style="--d:.16s">LestariPangan menelusuri gabah dan beras lewat 7 tahap: setoran petani, verifikasi, penggabungan, serah terima dua pihak, penggilingan, pengemasan, hingga QR di kemasan yang bisa dipindai konsumen.</p>
+      <div class="hero-cta rv" style="--d:.24s">
+        <a class="btn pri lg" href="/app#/masuk">Coba aplikasi <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+        <a class="btn lg" href="/t/LP-PKG-2026-0211">Lihat contoh jejak produk</a>
+      </div>
+      <ul class="trust rv" style="--d:.32s">
+        <li><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>Konfirmasi dua pihak</li>
+        <li><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>Jejak berantai hash</li>
+        <li><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>Celah data ditampilkan jujur</li>
+      </ul>
+    </div>
+    <div class="hero-art rv" style="--d:.2s" aria-hidden="true">
+      <svg viewBox="0 0 520 440" class="route-art" role="img" aria-label="Ilustrasi rantai pasok: sawah, pengepul, penggilingan, distributor, toko, konsumen">
+        <defs>
+          <linearGradient id="gp" x1="0" x2="1"><stop offset="0" stop-color="#2E9150"/><stop offset="1" stop-color="#F2B21B"/></linearGradient>
+          <radialGradient id="gl" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#F2B21B" stop-opacity=".45"/><stop offset="1" stop-color="#F2B21B" stop-opacity="0"/></radialGradient>
+        </defs>
+        <circle cx="260" cy="220" r="190" fill="url(#gl)" class="breathe"/>
+        <path id="route" d="M70 360 C 70 290, 150 300, 150 240 S 230 190, 260 170 S 360 140, 380 110 S 450 90, 450 60" fill="none" stroke="#BFE0CA" stroke-width="6" stroke-linecap="round"/>
+        <path d="M70 360 C 70 290, 150 300, 150 240 S 230 190, 260 170 S 360 140, 380 110 S 450 90, 450 60" fill="none" stroke="url(#gp)" stroke-width="6" stroke-linecap="round" class="flow"/>
+        <g class="nodes">
+          <g class="node" style="--i:0"><circle cx="70" cy="360" r="22"/><path d="M60 366c2-9 6-14 10-14s8 5 10 14M62 360c1-5 4-8 8-8" class="ico"/></g>
+          <g class="node" style="--i:1"><circle cx="150" cy="240" r="22"/><rect x="139" y="231" width="22" height="18" rx="3" class="ico"/><path d="M139 238h22" class="ico"/></g>
+          <g class="node" style="--i:2"><circle cx="260" cy="170" r="22"/><path d="M249 180v-14l11-6 11 6v14z" class="ico"/><path d="M255 180v-6h10v6" class="ico"/></g>
+          <g class="node" style="--i:3"><circle cx="380" cy="110" r="22"/><path d="M369 114h14l5-7h5v7M372 114v-8h8" class="ico"/><circle cx="374" cy="118" r="2.5" class="ico"/><circle cx="388" cy="118" r="2.5" class="ico"/></g>
+          <g class="node" style="--i:4"><circle cx="450" cy="60" r="22"/><path d="M441 66V54h18v12M441 54l2-6h14l2 6" class="ico"/></g>
+        </g>
+        <g class="labels" font-size="12" font-weight="600" fill="#1B5E34"><text x="70" y="400" text-anchor="middle">Kelompok tani</text><text x="150" y="282" text-anchor="middle">Pengepul</text><text x="260" y="212" text-anchor="middle">Penggilingan</text><text x="380" y="152" text-anchor="middle">Distributor</text><text x="450" y="100" text-anchor="middle">Retailer</text></g>
+        <g class="traveller"><circle r="9" fill="#F2B21B"><animateMotion dur="7s" repeatCount="indefinite" rotate="auto"><mpath href="#route"/></animateMotion></circle><circle r="15" fill="#F2B21B" opacity=".25"><animateMotion dur="7s" repeatCount="indefinite"><mpath href="#route"/></animateMotion><animate attributeName="r" values="10;20;10" dur="1.4s" repeatCount="indefinite"/></circle></g>
+      </svg>
+      <div class="float f1"><b>QR</b><span>dipindai konsumen</span></div>
+      <div class="float f2"><i class="ok-dot"></i><span>Hash cocok</span></div>
+      <div class="float f3"><b>2 pihak</b><span>konfirmasi terima</span></div>
+    </div>
+  </div>
+  <a class="scroll-hint" href="#alur" aria-label="Gulir ke alur"><i></i></a>
+</section>
+
+<!-- ================= ANGKA ================= -->
+<section class="wrap stats" aria-label="Ringkasan">
+  <div class="stat rv"><b data-count="7">0</b><span>tahap rantai pasok tercatat</span></div>
+  <div class="stat rv" style="--d:.08s"><b data-count="9">0</b><span>peran pengguna dengan hak akses terpisah</span></div>
+  <div class="stat rv" style="--d:.16s"><b data-count="2">0</b><span>pihak harus sepakat pada tiap serah terima</span></div>
+  <div class="stat rv" style="--d:.24s"><b data-count="1">0</b><span>QR di kemasan untuk membuka seluruh jejak</span></div>
+</section>
+
+<!-- ================= ALUR ================= -->
+<section class="section" id="alur">
+  <div class="wrap">
+    <div class="head rv"><span class="eyebrow">Alur</span><h2>Tujuh tahap, masing-masing ada aturan dan buktinya</h2><p>Pilih tahap untuk melihat apa yang dicatat, siapa yang bertanggung jawab, dan apa yang mencegah catatan keliru atau dipalsukan. Bergeser otomatis; klik untuk berhenti.</p></div>
+    <div class="flow-wrap rv">
+      <ol class="rail" id="rail" role="tablist" aria-label="Tahap alur"></ol>
+      <div class="progress"><i id="prog"></i></div>
+      <div class="stage" id="stage" aria-live="polite"></div>
+      <div class="stage-nav"><button class="btn sm" id="prev" aria-label="Tahap sebelumnya">← Sebelumnya</button><span id="count" class="small">1 / 7</span><button class="btn sm" id="next" aria-label="Tahap berikutnya">Berikutnya →</button><button class="btn sm" id="play" aria-pressed="true">Jeda</button></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= PERAN ================= -->
+<section class="section tint" id="peran">
+  <div class="wrap">
+    <div class="head rv"><span class="eyebrow">Peran</span><h2>Setiap pihak hanya melihat dan melakukan yang perlu</h2><p>Hak akses dibedakan per peran. Klik kartu untuk melihat apa yang bisa dilakukan.</p></div>
+    <div class="roles" id="roles"></div>
+  </div>
+</section>
+
+<!-- ================= BUKTI ================= -->
+<section class="section" id="bukti">
+  <div class="wrap two">
+    <div class="rv">
+      <span class="eyebrow">Bukti</span>
+      <h2>Catatan yang sulit diubah diam-diam</h2>
+      <p class="lead2">Setiap kejadian penting dicatat sebagai event dengan sidik jari (hash) yang menaut ke event sebelumnya. Kalau satu angka diubah, sidik jarinya tidak lagi cocok dan itu terlihat.</p>
+      <ul class="checks2">
+        <li><b>Dua pihak sepakat.</b> Pengirim mengisi berat kirim, penerima mengisi berat terima. Selisih di atas toleransi tidak lolos begitu saja, tetapi diputuskan admin.</li>
+        <li><b>Jujur soal batas.</b> Hash yang cocok hanya berarti catatan tidak berubah, bukan bahwa kejadian fisiknya benar. Tahap yang dicatat sendiri oleh pelaku diberi label itu.</li>
+        <li><b>Celah tidak ditutupi.</b> Tahap yang tidak ada datanya ditampilkan sebagai celah, tidak disambung otomatis.</li>
+      </ul>
+      <p class="small note">Saat ini jejak memakai ledger hash-chain simulasi, bukan blockchain publik.</p>
+    </div>
+    <div class="ledger rv" style="--d:.12s" aria-hidden="true" id="ledger">
+      <div class="blk"><span>Blok #4218301</span><code>a3f9…c21b</code><small>Setoran dicatat</small></div>
+      <div class="lnk"></div>
+      <div class="blk"><span>Blok #4218302</span><code>7be0…91d4</code><small>Diverifikasi admin</small></div>
+      <div class="lnk"></div>
+      <div class="blk"><span>Blok #4218303</span><code>0c5a…e7f8</code><small>Diterima gudang</small></div>
+      <button class="btn sm dan tamper" id="tamper" type="button">Coba ubah satu angka</button>
+      <div class="verdict" id="verdict">Semua hash cocok</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= KONSUMEN ================= -->
+<section class="section tint" id="konsumen">
+  <div class="wrap two">
+    <div class="phone rv" aria-hidden="true">
+      <div class="phone-in">
+        <div class="ph-hd"><img src="/assets/img/emblem.png" alt=""><b>LestariPangan</b></div>
+        <div class="ph-chip"><i class="ok-dot"></i> Jejak tercatat dan hash terverifikasi</div>
+        <div class="ph-bar"><i style="--w:60%;background:#237A41"></i><i style="--w:40%;background:#F2B21B"></i></div>
+        <div class="ph-small">60% KT Sumber Rejeki · 40% KT Harapan Jaya</div>
+        <ul class="ph-tl"><li style="--i:0">Kelompok tani → pengepul</li><li style="--i:1">Serah terima di gudang</li><li style="--i:2">Digiling · rendemen tercatat</li><li style="--i:3">Dikemas · lot LP-PKG-2026-0211</li></ul>
+      </div>
+      <div class="scan"></div>
+    </div>
+    <div class="rv" style="--d:.1s">
+      <span class="eyebrow">Konsumen</span>
+      <h2>Pindai, lalu lihat asal berasnya</h2>
+      <p class="lead2">Tanpa akun dan tanpa unduhan. Halaman menampilkan komposisi asal, peta kecamatan, urutan perjalanan, serta label apa saja yang sudah diverifikasi dan apa yang dicatat sendiri oleh pelaku.</p>
+      <div class="hero-cta"><a class="btn pri lg" href="/t/LP-PKG-2026-0211">Buka contoh halaman konsumen</a></div>
+      <p class="small note">Contoh memakai data simulasi.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================= TANYA JAWAB ================= -->
+<section class="section" id="tanya">
+  <div class="wrap narrow">
+    <div class="head rv"><span class="eyebrow">Tanya jawab</span><h2>Yang sering ditanyakan</h2></div>
+    <div class="faq" id="faq">
+      <details class="rv"><summary>Apakah ini sudah memakai blockchain?</summary><p>Belum. Yang berjalan sekarang adalah ledger hash-chain lokal sebagai simulasi. Antarmukanya disiapkan agar bisa diganti ke jaringan uji, tetapi itu belum diuji.</p></details>
+      <details class="rv"><summary>Apakah datanya asli?</summary><p>Bukan. Semua data dan akun demo adalah simulasi untuk peragaan. Halaman aplikasi juga menandainya.</p></details>
+      <details class="rv"><summary>Apa bedanya dengan sekadar catatan di spreadsheet?</summary><p>Setiap serah terima dikonfirmasi dua pihak, setiap tahap punya aturan dan peran yang berhak, perubahan terdeteksi lewat hash, dan konsumen bisa memeriksa jejaknya sendiri tanpa meminta ke siapa pun.</p></details>
+      <details class="rv"><summary>Apakah menjamin berasnya bermutu atau organik?</summary><p>Tidak. Sistem ini melacak asal dan perpindahan, bukan sertifikasi mutu, keamanan pangan, atau klaim organik.</p></details>
+      <details class="rv"><summary>Siapa yang memutuskan kalau ada masalah?</summary><p>Manusia yang berwenang. AI hanya membantu merangkum data dan tidak bisa menahan batch, memutus sengketa, atau memulai penarikan produk.</p></details>
+      <details class="rv"><summary>Bagaimana kalau tidak ada sinyal di lapangan?</summary><p>Pencatatan setoran bisa disimpan di perangkat dan dikirim otomatis saat sinyal kembali, tanpa tercatat ganda.</p></details>
+    </div>
+  </div>
+</section>
+
+<!-- ================= CTA AKHIR ================= -->
+<section class="final">
+  <div class="wrap rv"><h2>Siap menelusuri rantai pangan Anda?</h2><p>Masuk dengan akun demo atau daftar dengan kode undangan dari admin.</p>
+    <div class="hero-cta" style="justify-content:center"><a class="btn gold lg" href="/app#/masuk">Masuk ke aplikasi</a><a class="btn ghost lg" href="/app#/daftar">Daftar dengan kode referral</a></div></div>
+</section>
+</main>
+
+<footer class="foot2"><div class="wrap"><div class="logo"><img src="/assets/img/emblem.png" alt=""><b>Lestari<span>Pangan</span></b></div><p class="small">Prototipe traceability pangan · Tim TechTonic · semua data adalah simulasi</p><nav><a href="/app#/masuk">Masuk</a><a href="/app#/daftar">Daftar</a><a href="/app#/lupa">Lupa kata sandi</a><a href="/t/LP-PKG-2026-0211">Contoh jejak produk</a></nav></div></footer>
+<div class="notice" id="notice" role="status" hidden></div>
+</div>
+<script src="/js/landing.js"></script>
+</body>
+</html>

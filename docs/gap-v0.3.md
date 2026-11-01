@@ -57,7 +57,7 @@ Legenda: **Ada** = berfungsi dan teruji otomatis; **Sebagian** = ada, dengan bat
 | 16.1 | OpenAPI | Sebagian | Spesifikasi jalur publik dan mitra; endpoint internal belum |
 | 16.1 | API client dengan scope + rotasi | Sebagian | Scope, kedaluwarsa, nonaktif/hapus; rotasi otomatis belum |
 | 16.2 | Auth: logout, ganti sandi, pencabutan sesi | Ada | |
-| 16.2 | Reset sandi mandiri | Belum | Butuh email; admin dapat mereset |
+| 16.2 | Reset sandi mandiri | Sebagian | Token sekali pakai 30 menit, tidak membocorkan email terdaftar, dibatasi laju; tautan dikirim lewat email sehingga butuh SMTP (belum diuji dengan server nyata) |
 | 17.1 | Hash sandi, token sesi, pencabutan | Ada | scrypt; versi sesi |
 | 17.1 | Perlindungan brute-force, security headers, validasi isi gambar | Ada | |
 | 17.1 | MFA akun istimewa | Belum | |
@@ -67,7 +67,8 @@ Legenda: **Ada** = berfungsi dan teruji otomatis; **Sebagian** = ada, dengan bat
 | 17.2 | Klasifikasi data, retensi, log akses dokumen | Belum | |
 | 17.3 | Mode Lihat/Tindak | Ada | Pencabutan sesi istimewa manual belum ada (kedaluwarsa otomatis) |
 | 17.4 | Backup / restore | Sebagian | `npm run backup/restore`; RPO/RTO belum ditetapkan |
-| 18 | UI responsif, dashboard per peran | Ada | |
+| 18 | UI responsif, dashboard per peran | Ada | Diperiksa di Chrome pada 320/375/768/1024/1440 px tanpa gulir horizontal; menu laci di layar sempit |
+| 18 | Landing page, konfirmasi sebelum tindakan, logout ke beranda | Ada | Animasi menghormati prefers-reduced-motion |
 | 18 | Peta interaktif (Leaflet) | Belum | SVG skematis |
 | 19.1 | Metrik operasional | Sebagian | Tanpa persentil waktu verifikasi dan kualitas data |
 | 19.2–19.3 | Laporan & ekspor | Sebagian | CSV berlog (9 jenis); XLSX/PDF asli belum (PDF via cetak browser) |

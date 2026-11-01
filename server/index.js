@@ -54,7 +54,7 @@ async function start({ port = +process.env.PORT || 3000, dataDir = DATA, seed = 
       const mq = /^\/qr\/(.+)\.svg$/.exec(p); if (mq) { const base = (process.env.PUBLIC_URL || `${String(req.headers['x-forwarded-proto'] || 'http').split(',')[0]}://${String(req.headers['x-forwarded-host'] || req.headers.host).split(',')[0]}`).split('/').slice(0, 3).join('/'); const t = decodeURIComponent(mq[1]); return send(res, 200, qr.svg(t.startsWith('LP-PKG') || t.startsWith('LP-BATCH') || t.startsWith('LP-QR') ? `${base}/t/${t}` : t), { 'content-type': 'image/svg+xml', 'cache-control': 'public,max-age=3600' }); }
       if (p.startsWith('/uploads/')) { if (!auth.verifyUrl(p, u.query.e, u.query.s)) return send(res, 403, { error: 'Tautan bukti tidak valid atau kedaluwarsa' }); const f = path.join(DATA, 'uploads', path.basename(p)); if (fs.existsSync(f)) return send(res, 200, fs.readFileSync(f), { 'content-type': MIME[path.extname(f)] || 'application/octet-stream' }); return send(res, 404, 'Tidak ada'); }
       if (p.startsWith('/t/')) return send(res, 200, fs.readFileSync(path.join(PUB, 'trace.html')), { 'content-type': MIME['.html'] });
-      let f = path.join(PUB, p === '/' ? 'index.html' : p); if (!f.startsWith(PUB)) return send(res, 403, 'Dilarang');
+      let f = path.join(PUB, p === '/' ? 'index.html' : p === '/app' || p === '/app/' ? 'app.html' : p); if (!f.startsWith(PUB)) return send(res, 403, 'Dilarang');
       if (!fs.existsSync(f) || fs.statSync(f).isDirectory()) f = path.join(PUB, 'index.html');
       return send(res, 200, fs.readFileSync(f), { 'content-type': MIME[path.extname(f)] || 'application/octet-stream', 'cache-control': f.includes('fonts') || f.includes('img') ? 'public,max-age=86400' : 'no-cache' });
     } catch (e) {

@@ -25,7 +25,7 @@ Cek kesehatan: `GET /api/health`.
 
 Kode ketua kelompok tani (untuk Catat Setoran): `SUM-4821` (KT Sumber Rejeki), `HAR-3307` (KT Harapan Jaya), `MEK-5519` (KT Mekar Sari), `TAN-7742` (KT Tani Subur).
 Kode referral demo: `PENGEPUL-DEMO1`, `GUDANG-DEMO1`, `RETAILER-DEMO1`.
-Halaman konsumen (tanpa login): `/t/LP-PKG-2026-0211` (QR-nya ada di menu Pengemasan & QR gudang).
+Landing page di `/`, aplikasi di `/app`. Halaman konsumen (tanpa login): `/t/LP-PKG-2026-0211` (QR-nya ada di menu Pengemasan & QR gudang).
 
 ## Struktur
 ```
@@ -47,9 +47,12 @@ lestari-pangan/
 │  ├─ auth.js · qr.js · seed.js · paths.js
 │  └─ vendor/qr/           pustaka QR
 ├─ public/                 frontend (HTML/CSS/JS murni)
-│  ├─ index.html           aplikasi (SPA)
+│  ├─ index.html           landing page (beranda, /)
+│  ├─ app.html             aplikasi (SPA, /app): masuk, daftar, lupa/reset kata sandi, dashboard
 │  ├─ trace.html           halaman konsumen
-│  ├─ css/app.css
+│  ├─ css/app.css · landing.css · auth.css
+│  ├─ js/landing.js        animasi landing, alur 7 tahap, peran, demo ubah-hash
+│  ├─ js/auth.js           halaman masuk/daftar/lupa/reset
 │  ├─ js/core.js           util, API, sesi, layout, menu per peran
 │  ├─ js/screens-actor.js  layar pelaku rantai pasok + detail batch
 │  ├─ js/screens-admin.js  layar admin, pengawas, super admin, pengguna

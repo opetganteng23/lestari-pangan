@@ -11,6 +11,7 @@ const cfg = {
     { source: '/uploads/:path*', destination: `${origin}/uploads/:path*` },
     { source: '/qr/:path*', destination: `${origin}/qr/:path*` },
     { source: '/t/:path*', destination: '/trace.html' },
+    { source: '/app', destination: '/app.html' },
   ],
   headers: [
     { source: '/(.*)', headers: [

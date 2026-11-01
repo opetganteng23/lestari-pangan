@@ -20,6 +20,10 @@
     {
       "source": "/t/:path*",
       "destination": "/trace.html"
+    },
+    {
+      "source": "/app",
+      "destination": "/app.html"
     }
   ],
   "headers": [
