@@ -29,8 +29,8 @@ else {
       'tunnel   : cloudflared dijalankan (hostname diatur di dasbor Cloudflare)'
     }
     'tailscale' {
-      if (-not (Get-Command tailscale -ErrorAction SilentlyContinue)) { 'tunnel   : DILEWATI (Tailscale belum terpasang)'; break }
-      & tailscale funnel --bg $port 2>&1 | ForEach-Object { "tunnel   : $_" }
+      $ts = Get-TailscaleExe; if (-not $ts) { 'tunnel   : DILEWATI (Tailscale belum terpasang)'; break }
+      & $ts funnel --bg $port 2>&1 | ForEach-Object { "tunnel   : $_" }
     }
     'ssh' {
       $vps = Get-EnvValue 'LP_VPS_HOST'; $key = Get-EnvValue 'LP_SSH_KEY'; $rp = [int](Get-EnvValue 'LP_REMOTE_PORT' '13400')

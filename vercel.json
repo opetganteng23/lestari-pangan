@@ -7,15 +7,15 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://lestari-api.GANTI-DOMAIN.invalid/api/:path*"
+      "destination": "https://desktop-2lgq88i.tailf06a39.ts.net/api/:path*"
     },
     {
       "source": "/uploads/:path*",
-      "destination": "https://lestari-api.GANTI-DOMAIN.invalid/uploads/:path*"
+      "destination": "https://desktop-2lgq88i.tailf06a39.ts.net/uploads/:path*"
     },
     {
       "source": "/qr/:path*",
-      "destination": "https://lestari-api.GANTI-DOMAIN.invalid/qr/:path*"
+      "destination": "https://desktop-2lgq88i.tailf06a39.ts.net/qr/:path*"
     },
     {
       "source": "/t/:path*",
