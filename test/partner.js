@@ -15,7 +15,7 @@ const { start } = require('../server/index.js');
   await t('portal kelompok: hanya data kelompok sendiri, tanpa nilai uang', async () => {
     const a = (await call('/api/farmer/summary', { token: T.kt1 })).j, b = (await call('/api/farmer/summary', { token: T.kt2 })).j;
     assert.strictEqual(a.group.name, 'KT Sumber Rejeki'); assert.strictEqual(b.group.name, 'KT Harapan Jaya'); assert.ok(a.totals.count > 0); assert.ok(a.byMonth.length >= 1);
-    assert.ok(a.definitions.payment.includes('belum terintegrasi')); assert.ok(!JSON.stringify(a).match(/harga|rupiah|Rp/i));
+    assert.ok(a.definitions.payment.includes('belum terintegrasi')); assert.ok(!JSON.stringify(a).replace(/\?e=\d+&s=[\w-]+/g, '').match(/\b(harga|rupiah|rp)\b/i)); // tanda tangan URL acak diabaikan agar tidak cocok kebetulan
     const own = new Set(a.deposits.map((d) => d._id)); assert.ok(!b.deposits.some((d) => own.has(d._id)));
     assert.ok(a.deposits.every((d) => !d.notaPhoto || d.notaPhoto.includes('?e=')));
     assert.strictEqual((await call('/api/farmer/summary', { token: T.pengepul1 })).status, 403); assert.strictEqual((await call('/api/batches', { token: T.kt1 })).status, 403); assert.strictEqual((await call('/api/verifications', { token: T.kt1 })).status, 403);
