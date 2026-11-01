@@ -1,3 +1,4 @@
+process.env.LP_SKIP_DOTENV = '1'; // tes tidak boleh membaca .env pengguna
 // Uji render layar: menjalankan SEMUA layar tiap peran terhadap server nyata dengan DOM tiruan.
 // Menangkap galat runtime/templat (variabel tak terdefinisi, data tak terduga). Bukan pengganti uji visual di browser.
 const os = require('os'), fs = require('fs'), path = require('path'), vm = require('vm');
@@ -11,7 +12,7 @@ const dummy = () => new Proxy(function () {}, { get: (t, k) => (k === Symbol.toP
     fetch: (u, o) => fetch(String(u).startsWith('/') ? base + u : u, o), localStorage: store(), sessionStorage: store(), location: { hash: '', origin: base, pathname: '/', reload() {}, href: '' }, history: { back() {} }, navigator: { onLine: true }, indexedDB: undefined,
     document: { querySelector: () => dummy(), querySelectorAll: () => [], createElement: () => dummy(), body: dummy(), addEventListener() {} }, Image: function () {}, FileReader: function () {} };
   ctx.window = ctx; ctx.addEventListener = () => {}; vm.createContext(ctx);
-  const files = ['core', 'screens-actor', 'screens-admin', 'screens-ops', 'screens-farmer', 'screens-predict', 'offline', 'screens-common'];
+  const files = ['core', 'screens-actor', 'screens-admin', 'screens-ops', 'screens-server', 'screens-farmer', 'screens-predict', 'offline', 'screens-common'];
   vm.runInContext(files.map((f) => fs.readFileSync(path.join(__dirname, '../public/js', f + '.js'), 'utf8')).join('\n;\n') + '\n;globalThis.__x = { S, NAV, api, ld, sd, ss, get me() { return me; }, set me(v) { me = v; } };', ctx, { filename: 'public/js/*.js' });
   const X = ctx.__x; const main = () => ({ innerHTML: '', querySelectorAll: () => [], insertAdjacentHTML() {} });
   const ACCTS = ['sa', 'admin', 'pengawas', 'pengepul1', 'gudang1', 'distributor', 'logistik', 'retailer', 'kelompok.sumber'];

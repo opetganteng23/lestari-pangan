@@ -1,3 +1,4 @@
+process.env.LP_SKIP_DOTENV = '1'; // tes tidak boleh membaca .env pengguna
 // Uji Fase 4: portal kelompok tani, kunci API mitra, timbangan perangkat, idempotensi. Jalankan: node test/partner.js
 const os = require('os'), fs = require('fs'), path = require('path'), assert = require('assert');
 process.env.LOG = '0'; process.env.LP_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'lp-partner-'));

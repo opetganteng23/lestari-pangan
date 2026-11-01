@@ -32,7 +32,7 @@ module.exports = function build(D, A) {
     loginLimiter.clear(key); await col.users.update({ _id: u._id }, { lastLogin: D.now() });
     await D.audit({ user: u }, 'login', u.email); return { token: auth.sign({ uid: u._id, sv: u.sv || 0 }, 12 * 3600), user: pubUser(u) };
   }, { public: true });
-  add('GET', '/api/health', async () => ({ ok: true, store: A.storeKind, uptimeSec: Math.round(process.uptime()), time: D.now() }), { public: true });
+  add('GET', '/api/health', async () => ({ ok: true, demoAccounts: process.env.SEED_DEMO !== '0', store: A.storeKind, uptimeSec: Math.round(process.uptime()), time: D.now() }), { public: true });
   add('POST', '/api/logout', async (c) => { await col.users.update({ _id: c.user._id }, { sv: (c.user.sv || 0) + 1 }); await D.audit(c, 'logout', c.user.email); return { ok: true }; });
   add('POST', '/api/me/password', async (c) => {
     const b = c.body; if (!auth.checkPassword(String(b.current || ''), c.user.passwordHash)) throw bad('Kata sandi saat ini salah');
@@ -55,7 +55,7 @@ module.exports = function build(D, A) {
   const pubUser = (u) => ({ _id: u._id, name: u.name, email: u.email, role: u.role, actorId: u.actorId, groupId: u.groupId || null });
 
   // ----- sesi -----
-  add('GET', '/api/me', async (c) => ({ user: pubUser(c.user), role: c.role, actor: c.actor, group: c.group ? { _id: c.group._id, name: c.group.name, district: c.group.district } : null, act: c.act ? { role: c.act.role, actorId: c.act.actorId, reason: c.act.reason, exp: c.act.exp } : null, readOnly: !!c.readOnly, config: await D.cfg(), store: A.storeKind, network: require('./ledger').network, ai: process.env.ANTHROPIC_API_KEY ? 'claude' : 'rules' }));
+  add('GET', '/api/me', async (c) => ({ user: pubUser(c.user), role: c.role, actor: c.actor, group: c.group ? { _id: c.group._id, name: c.group.name, district: c.group.district } : null, service: D.serverctl.gateState(await D.serverctl.getGate()), act: c.act ? { role: c.act.role, actorId: c.act.actorId, reason: c.act.reason, exp: c.act.exp } : null, readOnly: !!c.readOnly, config: await D.cfg(), store: A.storeKind, network: require('./ledger').network, ai: process.env.ANTHROPIC_API_KEY ? 'claude' : 'rules' }));
   add('GET', '/api/actors', async (c) => { const f = c.query.role ? { role: c.query.role } : {}; return (await col.actors.find(f)).map((a) => ({ _id: a._id, name: a.name, role: a.role, district: a.district, lat: a.lat, lng: a.lng })); });
 
   // ----- super admin -----
@@ -207,6 +207,6 @@ module.exports = function build(D, A) {
 
   // ----- QR -----
   add('GET', '/api/qr', async (c) => ({ svg: qr.svg(c.query.text || '') }), { public: true });
-  const rc = { D, add, need, ACTOR_ROLES, bad, notFound, forbid, conflict, sec, auth, names, pubUser }; require('./routes-ops')(rc); require('./routes-partner')(rc);
+  const rc = { D, add, need, ACTOR_ROLES, bad, notFound, forbid, conflict, sec, auth, names, pubUser }; require('./routes-ops')(rc); require('./routes-partner')(rc); require('./routes-server')(rc);
   return R;
 };

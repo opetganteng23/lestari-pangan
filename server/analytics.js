@@ -26,7 +26,7 @@ module.exports = function createAnalytics(D) {
     return b;
   }
   async function claude(m) {
-    const key = process.env.ANTHROPIC_API_KEY; if (!key) return null;
+    const key = process.env.ANTHROPIC_API_KEY; if (!key || !D.serverctl.aiEnabledSync()) return null;
     const res = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' }, signal: AbortSignal.timeout(20000), body: JSON.stringify({ model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5', max_tokens: 600, system: 'Anda analis pengawasan rantai pasok pangan. Gunakan HANYA angka pada data JSON yang diberikan; jangan menghitung ulang atau mengarang angka. Jawab hanya JSON: {"bullets":["..."]} berisi 3-5 butir ringkasan bahasa Indonesia, singkat, netral, dan sebutkan keterbatasan cakupan data.', messages: [{ role: 'user', content: JSON.stringify(m) }] }) });
     if (!res.ok) throw new Error('Claude API ' + res.status);
     const j = await res.json(); const txt = j.content?.[0]?.text || ''; const o = JSON.parse(txt.slice(txt.indexOf('{'), txt.lastIndexOf('}') + 1));

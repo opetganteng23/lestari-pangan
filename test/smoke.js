@@ -1,3 +1,4 @@
+process.env.LP_SKIP_DOTENV = '1'; // tes tidak boleh membaca .env pengguna
 // Uji alur end-to-end lewat HTTP. Jalankan: node test/smoke.js
 const os = require('os'), fs = require('fs'), path = require('path'), assert = require('assert');
 process.env.LOG = '0'; process.env.LP_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'lp-test-'));

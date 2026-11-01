@@ -40,6 +40,7 @@ lestari-pangan/
 │  ├─ ops.js · copilot.js  kasus/recall, neraca massa, ekspor, email · AI Copilot baca-saja
 │  ├─ predict.js           forecasting, pemantauan model, Digital Twin
 │  ├─ routes-ops.js · routes-partner.js   rute fase 3–5 (kasus, portal petani, API mitra)
+│  ├─ serverctl.js · backup.js · env.js   gerbang layanan, pemantauan, cadangan, pemuat .env
 │  ├─ mailer.js            pengirim email (SMTP, belum diuji)
 │  ├─ analytics.js         metrik + ringkasan
 │  ├─ store.js             penyimpanan JSON / MongoDB
@@ -55,10 +56,14 @@ lestari-pangan/
 │  ├─ js/screens-ops.js    kasus, risiko, neraca massa, laporan, email, asisten analisis
 │  ├─ js/screens-farmer.js portal kelompok tani, integrasi API
 │  ├─ js/screens-predict.js prediksi & digital twin
+│  ├─ js/screens-server.js dashboard Server (admin)
 │  ├─ js/offline.js · sw.js antrean offline & service worker
 │  └─ assets/fonts · img
 ├─ contracts/LPAnchor.sol  kontrak anchor (belum diaudit/dideploy)
-├─ scripts/                backup & restore data
+├─ scripts/                backup/restore, init-env, check-env, make-vercel-json
+├─ Operasional/            tombol .bat: nyalakan/matikan/status/cadangkan (lihat BACA-SAYA.txt)
+├─ deploy/                 windows (start/stop/status/autostart) dan vps (nginx, Caddy)
+├─ vercel.json             konfigurasi frontend Vercel (dibuat oleh npm run vercel:config)
 ├─ test/                   unit · ledger · smoke · ops · partner · predict · ui-render
 ├─ docs/mts.md             MTS v0.3 (spesifikasi target)
 ├─ docs/mts-v0.2-baseline.md  baseline sesuai kode saat ini
@@ -67,9 +72,11 @@ lestari-pangan/
 ```
 
 ## Dokumen
-- [Status implementasi vs v0.3](docs/gap-v0.3.md) · [Panduan pilot](docs/pilot.md) · [MTS v0.3 (target)](docs/mts.md) · [Baseline v0.2 (sesuai kode)](docs/mts-v0.2-baseline.md) · [Fitur per peran](docs/fitur-per-peran.md)
+- [Deploy: Vercel + backend on-prem](docs/deploy-vercel.md) · [Status implementasi vs v0.3](docs/gap-v0.3.md) · [Panduan pilot](docs/pilot.md) · [MTS v0.3 (target)](docs/mts.md) · [Baseline v0.2 (sesuai kode)](docs/mts-v0.2-baseline.md) · [Fitur per peran](docs/fitur-per-peran.md)
 
-## Konfigurasi opsional (variabel lingkungan)
+## Konfigurasi (variabel lingkungan / berkas .env)
+Salin `.env.example` ke `.env` (`npm run init:env`) lalu periksa dengan `npm run check:env`. Variabel penting untuk deploy: `APP_SECRET`, `PUBLIC_URL`, `HOST`, `TRUST_PROXY`, `SEED_DEMO`, `ANTHROPIC_API_KEY`.
+
 - `PORT` (3000) · `APP_SECRET` · `LP_DATA_DIR`
 - `MONGODB_URI` (+ `npm i mongodb`) — pakai MongoDB, bukan berkas JSON. **Adapter ini ditulis tetapi belum diuji** (sandbox pengembangan tidak punya MongoDB).
 - `ANTHROPIC_API_KEY` (+ opsional `ANTHROPIC_MODEL`) — ringkasan pengawas ditarasikan Claude; angka tetap dihitung kode. Tanpa kunci: narasi berbasis aturan (diberi label). Belum diuji dengan API asli.

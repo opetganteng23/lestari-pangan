@@ -1,3 +1,4 @@
+require('./env');
 const http = require('http'), fs = require('fs'), path = require('path'), url = require('url');
 const { openStore } = require('./store'); const auth = require('./auth'); const qr = require('./qr');
 const sec = require('./security'); const createDomain = require('./domain'); const createAnalytics = require('./analytics'); const buildRoutes = require('./routes');
@@ -6,8 +7,14 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; cha
 
 async function start({ port = +process.env.PORT || 3000, dataDir = DATA, seed = true } = {}) {
   const store = await openStore(dataDir); const D = createDomain(store); const A = createAnalytics(D); A.storeKind = store.kind;
-  if (seed && (await store.isEmpty())) { await require('./seed')(D); console.log('Data simulasi dimuat.'); }
-  D.prov = require('./provenance')(D); D.ops = require('./ops')(D); D.copilot = require('./copilot')(D, A); D.predict = require('./predict')(D); const routes = buildRoutes(D, A);
+  if (seed && (await store.isEmpty())) {
+    if (process.env.SEED_DEMO === '0') { // produksi: hanya satu akun super admin dari ADMIN_EMAIL / ADMIN_PASSWORD
+      const em = String(process.env.ADMIN_EMAIL || '').toLowerCase().trim(), pw = String(process.env.ADMIN_PASSWORD || '');
+      const issue = sec.passwordIssue(pw); if (!/^[^s@]+@[^s@]+.[^s@]+$/.test(em) || issue) throw new Error('SEED_DEMO=0 butuh ADMIN_EMAIL valid dan ADMIN_PASSWORD kuat (' + (issue || 'email tidak valid') + ')');
+      await D.cfg(); await D.col.users.insert({ email: em, name: process.env.ADMIN_NAME || 'Super Admin', role: 'superadmin', actorId: null, passwordHash: auth.hashPassword(pw), active: true }); console.log('Data kosong; akun super admin dibuat dari ADMIN_EMAIL.');
+    } else { await require('./seed')(D); console.log('Data simulasi dimuat.'); }
+  }
+  D.store = store; D.serverctl = require('./serverctl')(D, store); await D.serverctl.getGate(); D.prov = require('./provenance')(D); D.ops = require('./ops')(D); D.copilot = require('./copilot')(D, A); D.predict = require('./predict')(D); const routes = buildRoutes(D, A);
   const signDeep = (v) => (typeof v === 'string' ? (v.startsWith('/uploads/') && !v.includes('?') ? auth.signUrl(v) : v) : Array.isArray(v) ? v.map(signDeep) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, signDeep(x)])) : v); const apiLimiter = sec.createLimiter({ max: +process.env.RATE_LIMIT_PER_MIN || 600, windowMs: 60000 }); const TRUST = process.env.TRUST_PROXY === '1';
   const clientIp = (req) => (TRUST && String(req.headers['x-forwarded-for'] || '').split(',')[0].trim()) || req.socket.remoteAddress || '?';
   const send = (res, code, body, headers = {}) => { const b = typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body); res.writeHead(code, { 'content-type': typeof body === 'object' && !Buffer.isBuffer(body) ? 'application/json; charset=utf-8' : 'text/plain', ...headers }); res.end(b); };
@@ -28,20 +35,23 @@ async function start({ port = +process.env.PORT || 3000, dataDir = DATA, seed = 
   const server = http.createServer(async (req, res) => {
     const u = url.parse(req.url, true); let p = decodeURIComponent(u.pathname).replace('/api/v1/', '/api/'); const rid = sec.reqId(), t0 = Date.now(), ip = clientIp(req);
     for (const [k, v] of Object.entries(sec.securityHeaders(req))) res.setHeader(k, v); res.setHeader('x-request-id', rid);
-    if (process.env.LOG !== '0') res.on('finish', () => console.log(JSON.stringify({ t: new Date().toISOString(), rid, ip, m: req.method, p, s: res.statusCode, ms: Date.now() - t0 })));
+    res.on('finish', () => { const ms = Date.now() - t0; D.serverctl.record({ t: Date.now(), rid, m: req.method, p, s: res.statusCode, ms, viaProxy: !!req.headers['x-forwarded-for'] }); if (process.env.LOG !== '0') console.log(JSON.stringify({ t: new Date().toISOString(), rid, ip, m: req.method, p, s: res.statusCode, ms })); });
     try {
       if (p.startsWith('/api/')) {
+        res.setHeader('cache-control', 'no-store');
         if (!apiLimiter.hit(ip)) return send(res, 429, { error: 'Terlalu banyak permintaan, coba lagi sebentar' }, { 'retry-after': String(apiLimiter.retryAfter(ip)) });
         for (const r of routes) {
           if (r.method !== req.method) continue; const m = r.re.exec(p); if (!m) continue;
-          const ctx = r.public ? {} : await buildCtx(req); ctx.ip = ip; ctx.headers = req.headers; ctx.params = m.groups || {}; ctx.query = u.query; ctx.body = req.method === 'GET' || req.method === 'DELETE' ? {} : await readBody(req);
+          const ctx = r.public ? {} : await buildCtx(req); ctx.ip = ip; ctx.headers = req.headers;
+          { const why = await D.serverctl.blockReason(req.method, p, r.public ? (p.startsWith('/api/partner/') ? 'mitra' : 'publik') : ctx.user.role); if (why) return send(res, 503, { error: why, gate: true }, { 'retry-after': '60' }); }
+          ctx.params = m.groups || {}; ctx.query = u.query; ctx.body = req.method === 'GET' || req.method === 'DELETE' ? {} : await readBody(req);
           const idemHdr = !r.public && req.method === 'POST' && ctx.user && String(req.headers['idempotency-key'] || '').slice(0, 100); const idemKey = idemHdr ? `${ctx.user._id}:${idemHdr}` : null; const bodyHash = idemKey ? require('crypto').createHash('sha256').update(JSON.stringify(ctx.body)).digest('hex') : null;
           if (idemKey) { const hit = await D.col.idem.findOne({ key: idemKey }); if (hit) { if (hit.bodyHash !== bodyHash) throw new D.HttpError(409, 'Idempotency-Key sudah dipakai untuk permintaan berbeda'); return send(res, 200, signDeep(hit.response), { 'idempotent-replay': 'true' }); } }
           const out = (await r.fn(ctx)) ?? { ok: true }; if (idemKey && !out.__csv) await D.col.idem.insert({ key: idemKey, bodyHash, response: out, at: new Date().toISOString() }); if (out && out.__csv) return send(res, 200, out.__csv.csv, { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="${out.__csv.filename}"` }); return send(res, 200, r.public ? out : signDeep(out));
         }
         return send(res, 404, { error: 'Endpoint tidak ditemukan' });
       }
-      const mq = /^\/qr\/(.+)\.svg$/.exec(p); if (mq) { const base = `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}`; const t = decodeURIComponent(mq[1]); return send(res, 200, qr.svg(t.startsWith('LP-PKG') || t.startsWith('LP-BATCH') || t.startsWith('LP-QR') ? `${base}/t/${t}` : t), { 'content-type': 'image/svg+xml', 'cache-control': 'public,max-age=3600' }); }
+      const mq = /^\/qr\/(.+)\.svg$/.exec(p); if (mq) { const base = (process.env.PUBLIC_URL || `${String(req.headers['x-forwarded-proto'] || 'http').split(',')[0]}://${String(req.headers['x-forwarded-host'] || req.headers.host).split(',')[0]}`).split('/').slice(0, 3).join('/'); const t = decodeURIComponent(mq[1]); return send(res, 200, qr.svg(t.startsWith('LP-PKG') || t.startsWith('LP-BATCH') || t.startsWith('LP-QR') ? `${base}/t/${t}` : t), { 'content-type': 'image/svg+xml', 'cache-control': 'public,max-age=3600' }); }
       if (p.startsWith('/uploads/')) { if (!auth.verifyUrl(p, u.query.e, u.query.s)) return send(res, 403, { error: 'Tautan bukti tidak valid atau kedaluwarsa' }); const f = path.join(DATA, 'uploads', path.basename(p)); if (fs.existsSync(f)) return send(res, 200, fs.readFileSync(f), { 'content-type': MIME[path.extname(f)] || 'application/octet-stream' }); return send(res, 404, 'Tidak ada'); }
       if (p.startsWith('/t/')) return send(res, 200, fs.readFileSync(path.join(PUB, 'trace.html')), { 'content-type': MIME['.html'] });
       let f = path.join(PUB, p === '/' ? 'index.html' : p); if (!f.startsWith(PUB)) return send(res, 403, 'Dilarang');
@@ -52,9 +62,9 @@ async function start({ port = +process.env.PORT || 3000, dataDir = DATA, seed = 
       send(res, code, { error: code === 500 ? 'Terjadi kesalahan di server' : e.message });
     }
   });
-  await new Promise((r) => server.listen(port, r));
+  const HOST = process.env.HOST || undefined; await new Promise((r) => (HOST ? server.listen(port, HOST, r) : server.listen(port, r)));
   const timer = setInterval(() => { D.processOutbox().catch(() => {}); D.ops.processEmails().catch(() => {}); }, 30000); timer.unref();
-  console.log(`LestariPangan berjalan di http://localhost:${server.address().port}  · data: ${store.kind}`);
+  console.log(`LestariPangan berjalan di http://${HOST || 'localhost'}:${server.address().port}  · data: ${store.kind}`);
   return { server, D, store, close: () => new Promise((r) => { clearInterval(timer); store.flush(); server.close(r); }) };
 }
 module.exports = { start };

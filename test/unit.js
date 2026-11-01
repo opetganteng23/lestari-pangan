@@ -1,3 +1,4 @@
+process.env.LP_SKIP_DOTENV = '1'; // tes tidak boleh membaca .env pengguna
 // Uji unit modul keamanan dan auth. Jalankan: node test/unit.js
 const assert = require('assert'), os = require('os'), fs = require('fs'), path = require('path');
 process.env.LP_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'lp-unit-'));
@@ -27,5 +28,10 @@ t('hash sandi dan token', () => {
   const h = auth.hashPassword('rahasia123'); assert.ok(auth.checkPassword('rahasia123', h)); assert.ok(!auth.checkPassword('salah', h));
   const tk = auth.sign({ uid: 'u1', sv: 2 }, 60); assert.deepStrictEqual([auth.verify(tk).uid, auth.verify(tk).sv], ['u1', 2]);
   assert.strictEqual(auth.verify(tk.slice(0, -2) + 'xx'), null); assert.strictEqual(auth.verify(auth.sign({ uid: 'u1' }, -5)), null);
+});
+t('parser .env: komentar, kutip, nilai kosong', () => {
+  const { parse } = require('../server/env');
+  const o = parse(['# c', 'A=1', 'B="x y" # k', 'C=', '  D = v  # ket', '=bad', 'E-F=1'].join('\n'));
+  assert.deepStrictEqual(o, { A: '1', B: 'x y', C: '', D: 'v' });
 });
 console.log(fails ? `\n${fails} uji gagal` : '\nSemua uji unit lulus'); process.exit(fails ? 1 : 0);

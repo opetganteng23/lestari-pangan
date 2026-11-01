@@ -74,7 +74,9 @@ Legenda: **Ada** = berfungsi dan teruji otomatis; **Sebagian** = ada, dengan bat
 | 20 | Konfigurasi env + operasional | Ada | |
 | 21 | Uji otomatis | Sebagian | Unit, ledger, e2e, ops, mitra, prediksi, render 90 layar; belum ada uji browser nyata, beban, keamanan eksternal |
 | 22 | `/api/health`, log JSON | Ada | |
-| 22 | Metrik, tracing, deployment terdokumentasi | Belum | |
+| 22 | Dashboard Server (status, lalu lintas p50/p95, gerbang layanan, AI, cadangan) | Ada | Menu Server (admin); tombol .bat di folder Operasional |
+| 22 | Deployment terdokumentasi (Vercel + on-prem) | Sebagian | docs/deploy-vercel.md; belum diuji di Vercel/VPS nyata |
+| 22 | Metrik ekspor (Prometheus) dan tracing terdistribusi | Belum | |
 | – | Offline-first Catat Setoran | Sebagian | IndexedDB + service worker + sinkron idempoten; belum diuji di perangkat/jaringan nyata |
 | – | Integrasi timbangan | Sebagian | API pembacaan + pencocokan 0,5%; tanpa validasi/kalibrasi perangkat sungguhan |
 | – | Integrasi logistik pihak ketiga | Sebagian | API pickup/antar ber-scope; belum diuji dengan sistem kurir nyata |

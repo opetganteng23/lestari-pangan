@@ -53,9 +53,9 @@ const NAV = {
 
 NAV.kelompok_tani = [['portal', 'Beranda Kelompok'], ['laporan', 'Laporan']];
 const ADD = {
-  admin: [['prediksi', 'Prediksi & Simulasi'], ['integrasi', 'Integrasi & API'], ['kasus', 'Kasus & Investigasi'], ['risiko', 'Papan Risiko'], ['neraca', 'Neraca Massa'], ['laporan', 'Laporan & Ekspor'], ['email', 'Pengiriman Email'], ['copilot', 'Asisten Analisis']],
+  admin: [['server', 'Server'], ['prediksi', 'Prediksi & Simulasi'], ['integrasi', 'Integrasi & API'], ['kasus', 'Kasus & Investigasi'], ['risiko', 'Papan Risiko'], ['neraca', 'Neraca Massa'], ['laporan', 'Laporan & Ekspor'], ['email', 'Pengiriman Email'], ['copilot', 'Asisten Analisis']],
   pengawas: [['prediksi', 'Prediksi & Simulasi'], ['kasus', 'Kasus & Investigasi'], ['risiko', 'Papan Risiko'], ['neraca', 'Neraca Massa'], ['laporan', 'Laporan & Ekspor'], ['copilot', 'Asisten Analisis']],
-  superadmin: [['prediksi', 'Prediksi & Simulasi'], ['integrasi', 'Integrasi & API'], ['kasus', 'Kasus & Investigasi'], ['risiko', 'Papan Risiko'], ['neraca', 'Neraca Massa'], ['laporan', 'Laporan & Ekspor'], ['email', 'Pengiriman Email'], ['copilot', 'Asisten Analisis']],
+  superadmin: [['server', 'Server'], ['prediksi', 'Prediksi & Simulasi'], ['integrasi', 'Integrasi & API'], ['kasus', 'Kasus & Investigasi'], ['risiko', 'Papan Risiko'], ['neraca', 'Neraca Massa'], ['laporan', 'Laporan & Ekspor'], ['email', 'Pengiriman Email'], ['copilot', 'Asisten Analisis']],
   gudang: [['neraca', 'Neraca Massa'], ['laporan', 'Laporan']],
 };
 for (const [k, v] of Object.entries(ADD)) NAV[k].push(...v);
@@ -80,6 +80,7 @@ function renderLogin() {
   <p class="small" style="margin-top:16px">Pengepul atau pihak baru? <a href="#" id="reg">Daftar dengan kode referral</a></p>
   <p class="small" style="margin-top:8px">Konsumen? Pindai QR di kemasan. <a href="/t/LP-PKG-2026-0211">Lihat contoh</a></p></div>
   <div class="r"><h3>Akun demo (kata sandi: lestari123)</h3>${accs.map((a) => `<button class="acc" data-e="${a[0]}">${esc(a[1])}<small>${esc(a[2])}</small></button>`).join('')}</div></div></div>`;
+  fetch('/api/health').then((r) => r.json()).then((h) => { if (h.demoAccounts === false) { const r = document.querySelector('.login .r'); if (r) r.remove(); const bx = document.querySelector('.login .box'); if (bx) bx.style.gridTemplateColumns = '1fr'; } }).catch(() => {});
   document.querySelectorAll('.acc').forEach((b) => (b.onclick = () => { const f = $('#lf'); f.email.value = b.dataset.e; f.password.value = 'lestari123'; f.requestSubmit(); }));
   $('#lf').onsubmit = guard(async (e) => { e.preventDefault(); const fd = Object.fromEntries(new FormData(e.target)); const r = await api('/api/login', { method: 'POST', body: fd, raw: true }); sd('lp_token', r.token); ss.set('lp_act', null); ss.set('lp_view', null); location.hash = '#/'; await loadMe(); renderApp(); });
   $('#reg').onclick = (e) => { e.preventDefault(); openModal({ title: 'Daftar dengan kode referral', submit: 'Daftar', body: `<p class="small">Pengepul dan pihak rantai pasok lain hanya bisa mendaftar dengan kode dari admin. Contoh demo: <b>PENGEPUL-DEMO1</b>.</p>${fld('code', 'Kode referral')}${fld('name', 'Nama usaha')}${fld('district', 'Kabupaten/kecamatan', { required: false })}${fld('email', 'Email', { type: 'email' })}${fld('password', 'Kata sandi (min. 8 karakter)', { type: 'password' })}`, onSubmit: async (fd, close) => { await api('/api/register', { method: 'POST', body: fd, raw: true }); close(); toast('Pendaftaran berhasil. Silakan masuk.'); } }); };
@@ -91,13 +92,14 @@ async function renderApp() {
   if (act && me.act === null && me.user.role === 'superadmin') { ss.set('lp_act', null); }
   let counts = {};
   if (['admin', 'superadmin'].includes(role)) { try { counts = { pending: (await api('/api/verifications')).length, disputed: (await api('/api/transfers?box=disputed')).filter((t) => t.status === 'disputed').length }; } catch {} }
+  const svcBan = (me.service && !me.service.open && !['admin', 'superadmin', 'pengawas'].includes(me.user.role)) ? `<div class="ban">Pencatatan baru sedang dijeda: ${esc(me.service.reason)} Anda tetap bisa melihat data.</div>` : '';
   const banner = me.act ? `<div class="ban">Mode Tindak aktif · bertindak sebagai ${esc(ROLE[me.act.role])} · ${esc(me.actor?.name)} · berakhir <b id="cd"></b><span class="small" style="color:#5a4300">Alasan: ${esc(me.act.reason)}</span><button class="btn sm" onclick="leaveMode()">Keluar Mode Tindak</button></div>` : me.readOnly ? `<div class="ban view">Mode Lihat · melihat sebagai ${esc(ROLE[me.role])} · ${esc(me.actor?.name)} · baca-saja, tercatat di audit log<button class="btn sm" onclick="leaveMode()">Keluar Mode Lihat</button></div>` : '';
   $('#root').innerHTML = `<div class="app"><div class="side"><div class="brand"><img src="/assets/img/emblem.png" alt=""><div><b>Lestari<span>Pangan</span></b><small>Traceability pangan</small></div></div><div class="sec">${esc(ROLE[role])}</div>
   ${nav.map((n) => `<a class="nav" href="#/${n[0]}" data-r="${n[0]}"><i></i>${esc(n[1])}${n[2] && counts[n[2]] ? `<span class="badge">${counts[n[2]]}</span>` : ''}</a>`).join('')}
   <div class="foot">${esc(me.store)}<br>Ledger: ${esc(me.network)}<br>Analitik: ${me.ai === 'claude' ? 'Claude' : 'berbasis aturan'}</div></div>
   <div class="col"><div class="top"><h1 id="ttl"></h1><span class="demo">DATA SIMULASI</span><div class="sp"></div><div style="position:relative"><button class="bell" id="bell" title="Notifikasi">&#128276;<b id="bn" style="display:none"></b></button><div class="pop" id="pop" style="display:none"></div></div>
   <div class="user"><div class="av">${esc(me.user.name.split(' ').map((w) => w[0]).slice(0, 2).join(''))}</div><div>${esc(me.actor?.name || me.user.name)}<small>${esc(me.act ? 'Mode Tindak (' + me.user.name + ')' : ROLE[me.user.role])}</small></div></div><button class="btn sm" onclick="logout()">Keluar</button></div>
-  ${banner}<div class="main" id="main"></div></div></div>`;
+  ${svcBan}${banner}<div class="main" id="main"></div></div></div>`;
   if (me.act) { const tick = () => { const s = me.act.exp - Math.floor(Date.now() / 1000); if (s <= 0) { toast('Mode Tindak berakhir', true); leaveMode(); return; } const el = $('#cd'); if (el) el.textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }; tick(); setInterval(tick, 1000); }
   $('#bell').onclick = guard(async () => { const p = $('#pop'); if (p.style.display === 'block') { p.style.display = 'none'; return; } const ns = await api('/api/notifications'); p.innerHTML = ns.length ? ns.map((n) => `<div class="n">${esc(n.text)}<small>${dt(n.at)} · ${n.delivery === 'manual' ? 'pemberitahuan manual (dalam aplikasi)' : 'antrean email'}</small></div>`).join('') : '<div class="empty">Belum ada notifikasi</div>'; p.style.display = 'block'; await api('/api/notifications/read', { method: 'POST' }); $('#bn').style.display = 'none'; });
   api('/api/notifications').then((ns) => { const u = ns.filter((n) => !n.read).length; if (u) { const b = $('#bn'); b.textContent = u; b.style.display = 'block'; } }).catch(() => {});

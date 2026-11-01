@@ -1,6 +1,6 @@
 // Service worker: cangkang aplikasi tersedia offline. Data /api, /uploads, dan halaman konsumen TIDAK disimpan (privasi & kesegaran data).
 const CACHE = 'lp-shell-v1';
-const SHELL = ['/', '/css/app.css', '/js/core.js', '/js/screens-actor.js', '/js/screens-admin.js', '/js/screens-ops.js', '/js/screens-common.js', '/js/screens-farmer.js', '/js/screens-predict.js', '/js/offline.js', '/assets/img/emblem.png', '/assets/fonts/Poppins-Regular.ttf', '/assets/fonts/Poppins-Medium.ttf', '/assets/fonts/Poppins-Bold.ttf', '/assets/fonts/Poppins-Light.ttf'];
+const SHELL = ['/', '/css/app.css', '/js/core.js', '/js/screens-actor.js', '/js/screens-admin.js', '/js/screens-ops.js', '/js/screens-server.js', '/js/screens-common.js', '/js/screens-farmer.js', '/js/screens-predict.js', '/js/offline.js', '/assets/img/emblem.png', '/assets/fonts/Poppins-Regular.ttf', '/assets/fonts/Poppins-Medium.ttf', '/assets/fonts/Poppins-Bold.ttf', '/assets/fonts/Poppins-Light.ttf'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => Promise.all(SHELL.map((u) => c.add(u).catch(() => {})))).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => { e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', (e) => {

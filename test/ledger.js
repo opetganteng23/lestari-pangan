@@ -1,3 +1,4 @@
+process.env.LP_SKIP_DOTENV = '1'; // tes tidak boleh membaca .env pengguna
 // Uji kepatuhan antarmuka adapter ledger. Jalankan: node test/ledger.js  (LEDGER_ADAPTER=local bawaan)
 const assert = require('assert'), os = require('os'), fs = require('fs'), path = require('path');
 process.env.LP_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'lp-ledger-'));

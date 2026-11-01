@@ -79,7 +79,7 @@ Balas HANYA JSON: {"facts":[{"text":"","refs":[]}],"inference":[""],"recommendat
     const t0 = Date.now(); const steps = plan(question); const results = [];
     for (const [name, arg] of steps) results.push(await TOOLS[name](ctx, arg));
     let body, source = 'rules', note = null;
-    try { const ai = await askClaude(question, results); if (ai) { body = ai; source = 'claude'; } } catch (e) { note = 'AI gagal, memakai jawaban berbasis aturan: ' + e.message; }
+    try { const allow = await D.serverctl.aiAllowed(ctx.user._id); if (!allow.ok) note = 'Memakai jawaban berbasis aturan: ' + allow.why; else { const ai = await askClaude(question, results); if (ai) { body = ai; source = 'claude'; } } } catch (e) { note = 'AI gagal, memakai jawaban berbasis aturan: ' + e.message; }
     if (!body) body = ruleAnswer(results);
     const refs = results.flatMap((r) => r.refs);
     const out = { question, source, model: source === 'claude' ? MODEL() : null, tools: steps.map((s) => s[0]), ...body, references: refs, note, period: 'data saat ini', generatedAt: D.now(),

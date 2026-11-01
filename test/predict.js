@@ -1,3 +1,4 @@
+process.env.LP_SKIP_DOTENV = '1'; // tes tidak boleh membaca .env pengguna
 // Uji Fase 5: kesiapan data, forecasting + evaluasi temporal, monitoring, Digital Twin. Jalankan: node test/predict.js
 const os = require('os'), fs = require('fs'), path = require('path'), assert = require('assert');
 process.env.LOG = '0'; process.env.LP_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'lp-predict-'));
