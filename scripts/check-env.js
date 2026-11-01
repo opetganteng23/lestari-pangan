@@ -10,6 +10,12 @@ const pu = v('PUBLIC_URL');
 if (!pu || /NAMA-PROYEK/.test(pu)) bad.push('PUBLIC_URL belum diisi dengan alamat situs Vercel Anda (QR kemasan akan salah)');
 else if (!/^https:\/\/[^/\s]+$/.test(pu)) bad.push('PUBLIC_URL harus berbentuk https://host tanpa garis miring akhir');
 else ok.push('PUBLIC_URL = ' + pu);
+const tun = (v('LP_TUNNEL') || 'none').toLowerCase();
+if (tun === 'none') warn.push('LP_TUNNEL=none: Vercel tidak akan bisa menjangkau backend ini (pilih cloudflared atau tailscale)');
+else if (tun === 'cloudflared') { if (!v('LP_CF_TUNNEL_TOKEN')) bad.push('LP_TUNNEL=cloudflared butuh LP_CF_TUNNEL_TOKEN'); else ok.push('Tunnel cloudflared dikonfigurasi'); }
+else if (tun === 'tailscale') ok.push('Tunnel Tailscale Funnel dipilih (pastikan Funnel aktif di konsol Tailscale)');
+else if (tun === 'ssh') { if (!v('LP_VPS_HOST') || !v('LP_SSH_KEY')) bad.push('LP_TUNNEL=ssh butuh LP_VPS_HOST dan LP_SSH_KEY'); else ok.push('Tunnel SSH dikonfigurasi'); }
+else bad.push('LP_TUNNEL tidak dikenal: ' + tun);
 if (v('HOST') !== '127.0.0.1') warn.push('HOST bukan 127.0.0.1: backend bisa terjangkau dari jaringan lokal, tidak hanya lewat tunnel');
 if (v('TRUST_PROXY') !== '1') warn.push('TRUST_PROXY bukan 1: semua pengguna akan tampak satu IP di balik proxy');
 if (v('SEED_DEMO') === '0') {

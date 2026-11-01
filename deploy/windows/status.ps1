@@ -5,8 +5,9 @@ $port = [int](Get-EnvValue 'PORT' '3000')
 $health = $null
 try { $health = (Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:$port/api/health" -TimeoutSec 4).Content } catch { }
 & $line 'Backend' ([bool]$health) $(if ($health) { $health } else { "127.0.0.1:$port tidak menjawab (nyalakan: Nyalakan-LestariPangan.bat)" })
-$tun = Get-TunnelProcs
-& $line 'Tunnel' ([bool]$tun) $(if ($tun) { 'terhubung ke VPS (tersambung ulang otomatis)' } else { 'tidak berjalan; situs publik tidak dapat menjangkau backend' })
+$mode = Get-TunnelMode
+$tun = Test-TunnelUp
+& $line 'Tunnel' $tun $(if ($tun) { "$mode aktif" } else { "tidak berjalan (LP_TUNNEL=$mode); situs publik tidak dapat menjangkau backend" })
 $api = Get-EnvValue 'LP_API_PUBLIC_URL'
 if ($api) { $pub = $null; try { $pub = (Invoke-WebRequest -UseBasicParsing "$api/api/health" -TimeoutSec 8).Content } catch { }; & $line 'API publik' ([bool]$pub) $(if ($pub) { "$api -> $pub" } else { "$api/api/health tidak menjawab" }) }
 $site = Get-EnvValue 'PUBLIC_URL'

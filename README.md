@@ -62,7 +62,7 @@ lestari-pangan/
 ├─ contracts/LPAnchor.sol  kontrak anchor (belum diaudit/dideploy)
 ├─ scripts/                backup/restore, init-env, check-env, make-vercel-json
 ├─ Operasional/            tombol .bat: nyalakan/matikan/status/cadangkan (lihat BACA-SAYA.txt)
-├─ deploy/                 windows (start/stop/status/autostart) dan vps (nginx, Caddy)
+├─ deploy/windows/         skrip start/stop/status/autostart + tunnel (cloudflared/tailscale/ssh)
 ├─ vercel.json             konfigurasi frontend Vercel (dibuat oleh npm run vercel:config)
 ├─ test/                   unit · ledger · smoke · ops · partner · predict · ui-render
 ├─ docs/mts.md             MTS v0.3 (spesifikasi target)

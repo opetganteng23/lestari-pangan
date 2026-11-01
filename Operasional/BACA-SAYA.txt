@@ -1,6 +1,6 @@
 Tombol operasional LestariPangan (klik dua kali):
 
-  Nyalakan-LestariPangan.bat   menyalakan backend + tunnel ke VPS, lalu menampilkan status
+  Nyalakan-LestariPangan.bat   menyalakan backend + tunnel (LP_TUNNEL di .env), lalu menampilkan status
   Matikan-LestariPangan.bat    mematikan backend dan tunnel
   Status-LestariPangan.bat     memeriksa backend, tunnel, situs publik, AI, mulai-otomatis
   Cadangkan-Data.bat           menyalin data ke folder backups
