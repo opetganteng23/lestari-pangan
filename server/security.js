@@ -61,7 +61,7 @@ function securityHeaders(req) {
     'referrer-policy': 'same-origin',
     'permissions-policy': 'camera=(self), microphone=(), geolocation=(self)',
     'cross-origin-opener-policy': 'same-origin',
-    'content-security-policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+    'content-security-policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://tile.openstreetmap.org; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
   };
   if ((req.headers['x-forwarded-proto'] || '') === 'https') h['strict-transport-security'] = 'max-age=15552000; includeSubDomains';
   return h;

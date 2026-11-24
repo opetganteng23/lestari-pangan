@@ -48,6 +48,23 @@ const R = require('../server/regions'); const { start } = require('../server/ind
     assert.strictEqual((await call('/api/groups/' + id, { method: 'PUT', token: admin, body: { district: 'Karawang' } })).status, 200);
     const kr = R.REGIONS.find((q) => q.name === 'Kabupaten Karawang'); const p3 = (await call('/api/dashboard', { token: admin })).j.points.find((x) => x.name === 'KT Wilayah'); assert.deepStrictEqual([p3.district, p3.lat, p3.lng], ['Kabupaten Karawang', kr.lat, kr.lng]);
   });
+  await t('Leaflet lokal tersedia dan CSP hanya menambah host tile OSM', async () => {
+    for (const p of ['/vendor/leaflet/leaflet.js', '/vendor/leaflet/leaflet.css', '/vendor/markercluster/leaflet.markercluster.js', '/js/map.js']) assert.strictEqual((await fetch(base + p)).status, 200, p);
+    const csp = (await fetch(base + '/app')).headers.get('content-security-policy'); assert.ok(csp.includes("img-src 'self' data: blob: https://tile.openstreetmap.org;")); assert.ok(!csp.includes('*')); assert.match(csp, /script-src 'self' 'unsafe-inline';/); assert.match(csp, /connect-src 'self';/);
+    const vj = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'vercel.json'), 'utf8')); const vc = JSON.stringify(vj); assert.ok(vc.includes('https://tile.openstreetmap.org'));
+  });
+  await t('/api/me: simulation menyala selama SEED_DEMO atau DEMO_MODE aktif, mati bila keduanya 0', async () => {
+    const sim = async () => (await call('/api/me', { token: admin })).j.simulation; const o = [process.env.SEED_DEMO, process.env.DEMO_MODE];
+    try { delete process.env.SEED_DEMO; delete process.env.DEMO_MODE; assert.strictEqual(await sim(), true); process.env.SEED_DEMO = '0'; assert.strictEqual(await sim(), true); process.env.DEMO_MODE = '0'; assert.strictEqual(await sim(), false); delete process.env.SEED_DEMO; assert.strictEqual(await sim(), true); }
+    finally { for (const [k, v] of [['SEED_DEMO', o[0]], ['DEMO_MODE', o[1]]]) { if (v === undefined) delete process.env[k]; else process.env[k] = v; } }
+  });
+  await t('/api/me: features bawaan kosong (mode pilot); FEATURES menyalakan hanya nama yang dikenal', async () => {
+    const f = async () => (await call('/api/me', { token: admin })).j.features; const o = process.env.FEATURES;
+    try { delete process.env.FEATURES; assert.deepStrictEqual(await f(), []); process.env.FEATURES = 'Prediksi, email ,ngawur'; assert.deepStrictEqual(await f(), ['prediksi', 'email']); }
+    finally { if (o === undefined) delete process.env.FEATURES; else process.env.FEATURES = o; }
+  });
+  await t('endpoint tak terpakai /api/qr sudah dihapus; passport publik tetap ada', async () => { assert.strictEqual((await call('/api/qr?text=x')).status, 404); assert.strictEqual((await call('/api/products/LP-PKG-2026-0211/passport')).status, 200); });
+  await t('sprite ikon disajikan', async () => { const r = await fetch(base + '/assets/icons.svg'); assert.strictEqual(r.status, 200); assert.match(r.headers.get('content-type'), /svg/); });
   const col = s.D.col;
   const mk = (name, district, lat, lng) => col.actors.insert({ name, role: 'pengepul', district, lat, lng });
   const a1 = await mk('Mig Default Dikenal', 'Subang', -6.6, 107.6), a2 = await mk('Mig Default Asing', 'Atlantis', -6.6, 107.6), a3 = await mk('Mig Titik Sendiri', 'Subang', -6.1, 107.1);

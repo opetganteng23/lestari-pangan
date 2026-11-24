@@ -53,9 +53,22 @@ function openModal({ title, body, submit = 'Simpan', onSubmit, cancel = 'Batal',
   return { close, el: bg };
 }
 const fld = (name, label, o = {}) => `<label class="f">${label}</label>${o.type === 'select' ? `<select class="inp" name="${name}" ${o.required === false ? '' : 'required'}>${o.options}</select>` : o.type === 'textarea' ? `<textarea class="inp" name="${name}" rows="3" ${o.required === false ? '' : 'required'} placeholder="${esc(o.ph || '')}"></textarea>` : `<input class="inp" name="${name}" type="${o.type || 'text'}" ${o.step ? `step="${o.step}"` : ''} ${o.required === false ? '' : 'required'} value="${esc(o.value ?? '')}" placeholder="${esc(o.ph || '')}" ${o.min ? `min="${o.min}"` : ''}>`}`;
+// Daftar wilayah resmi dari server (satu kali per sesi halaman). regionOpts() menghasilkan <option> dikelompokkan per provinsi.
+let _regions = null;
+const loadRegions = async () => (_regions ||= await api('/api/regions', { raw: true }));
+const regionOpts = (selected) => { const rs = _regions || [], last = String(selected || '').split(',').pop().trim(); const hit = rs.find((r) => r.name === last) || rs.find((r) => r.name === 'Kabupaten ' + last); const provs = [...new Set(rs.map((r) => r.province))];
+  return '<option value="">Pilih kabupaten / kota</option>' + provs.map((p) => `<optgroup label="${esc(p)}">${rs.filter((r) => r.province === p).map((r) => `<option value="${esc(r.name)}"${hit === r ? ' selected' : ''}>${esc(r.name)}</option>`).join('')}</optgroup>`).join(''); };
 const opts = (arr, v, l, ph) => (ph ? `<option value="">${esc(ph)}</option>` : '') + arr.map((x) => `<option value="${esc(x[v])}">${esc(typeof l === 'function' ? l(x) : x[l])}</option>`).join('');
 
 // ---------- navigasi per peran ----------
+// ---------- ikon (sprite lokal /assets/icons.svg) ----------
+const ic = (n, cls) => '<svg class="ic' + (cls ? ' ' + cls : '') + '" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#i-' + n + '"/></svg>';
+const NAV_IC = { beranda: 'home', portal: 'home', 'setoran-baru': 'plus-circle', setoran: 'clipboard', batch: 'package', kirim: 'truck', kiriman: 'truck', label: 'qr', terima: 'inbox', kemasan: 'box', verifikasi: 'shield-check', pengguna: 'users', pelaku: 'badge', kelompok: 'sprout', sengketa: 'scale', integritas: 'link', konfigurasi: 'sliders', audit: 'file', dashboard: 'grid', tracelog: 'route', anomali: 'alert', tren: 'trend', server: 'server', prediksi: 'chart', integrasi: 'plug', kasus: 'folder-search', risiko: 'gauge', neraca: 'scale', laporan: 'download', email: 'mail', copilot: 'sparkles', profil: 'user', 'mode-tindak': 'zap', 'mode-lihat': 'eye', mode: 'zap' };
+// Pengelompokan menu per seksi. Peran pelaku rantai pasok hanya punya satu seksi (Operasional) dan Akun.
+const NAV_SEC = { verifikasi: 'Pengawasan', sengketa: 'Pengawasan', dashboard: 'Pengawasan', tracelog: 'Pengawasan', anomali: 'Pengawasan', tren: 'Pengawasan', integritas: 'Pengawasan', kasus: 'Pengawasan', risiko: 'Pengawasan', neraca: 'Pengawasan', laporan: 'Pengawasan', mode: 'Administrasi', pengguna: 'Administrasi', pelaku: 'Administrasi', kelompok: 'Administrasi', konfigurasi: 'Administrasi', audit: 'Administrasi', 'mode-tindak': 'Administrasi', server: 'Lanjutan', prediksi: 'Lanjutan', integrasi: 'Lanjutan', email: 'Lanjutan', copilot: 'Lanjutan', profil: 'Akun' };
+const SEC_ORDER = ['Operasional', 'Pengawasan', 'Administrasi', 'Lanjutan', 'Akun'];
+const secOf = (id, role) => (id === 'profil' ? 'Akun' : ['pengepul', 'gudang', 'distributor', 'logistik', 'retailer', 'kelompok_tani'].includes(role) ? 'Operasional' : NAV_SEC[id] || 'Operasional');
+const navHtml = (nav, role, counts) => { let cur = '', out = ''; for (const n of SEC_ORDER.flatMap((s) => nav.filter((x) => secOf(x[0], role) === s))) { const s = secOf(n[0], role); if (s !== cur) { cur = s; out += '<div class="nsec">' + s + '</div>'; } out += '<a class="nav" href="#/' + n[0] + '" data-r="' + n[0] + '">' + ic(NAV_IC[n[0]] || 'grid') + '<span>' + esc(n[1]) + '</span>' + (n[2] && counts[n[2]] ? '<span class="badge">' + counts[n[2]] + '</span>' : '') + '</a>'; } return out; };
 const NAV = {
   pengepul: [['beranda', 'Beranda'], ['setoran-baru', 'Catat Setoran'], ['setoran', 'Setoran Saya'], ['batch', 'Batch & Gabung'], ['kirim', 'Kirim & Transfer'], ['label', 'QR Label']],
   gudang: [['beranda', 'Beranda'], ['terima', 'Terima Barang'], ['batch', 'Batch & Lineage'], ['kemasan', 'Pengemasan & QR'], ['kirim', 'Kirim']],
@@ -63,8 +76,8 @@ const NAV = {
   logistik: [['beranda', 'Beranda'], ['kiriman', 'Kiriman Saya']],
   retailer: [['beranda', 'Beranda'], ['terima', 'Terima Barang'], ['batch', 'Stok & Asal Produk']],
   admin: [['beranda', 'Beranda'], ['verifikasi', 'Antrean Verifikasi', 'pending'], ['pengguna', 'Pengguna'], ['pelaku', 'Pelaku & Kode Referral'], ['kelompok', 'Kelompok Tani'], ['sengketa', 'Sengketa Transfer', 'disputed'], ['integritas', 'Integritas Blockchain'], ['konfigurasi', 'Konfigurasi'], ['audit', 'Audit Log']],
-  pengawas: [['dashboard', 'Dashboard'], ['tracelog', 'Trace Log'], ['anomali', 'Anomali'], ['tren', 'Tren Pasokan'], ['integritas', 'Integritas Blockchain'], ['audit', 'Audit Log']],
-  superadmin: [['mode-tindak', 'Mode Tindak'], ['mode-lihat', 'Mode Lihat'], ['dashboard', 'Dashboard Pengawasan'], ['verifikasi', 'Antrean Verifikasi', 'pending'], ['pengguna', 'Pengguna'], ['pelaku', 'Pelaku & Kode Referral'], ['kelompok', 'Kelompok Tani'], ['sengketa', 'Sengketa Transfer', 'disputed'], ['tracelog', 'Trace Log'], ['anomali', 'Anomali'], ['tren', 'Tren Pasokan'], ['integritas', 'Integritas Blockchain'], ['konfigurasi', 'Konfigurasi'], ['audit', 'Audit Log']],
+  pengawas: [['dashboard', 'Dashboard'], ['integritas', 'Integritas Blockchain'], ['audit', 'Audit Log']],
+  superadmin: [['mode', 'Mode Tindak & Lihat'], ['dashboard', 'Dashboard Pengawasan'], ['verifikasi', 'Antrean Verifikasi', 'pending'], ['pengguna', 'Pengguna'], ['pelaku', 'Pelaku & Kode Referral'], ['kelompok', 'Kelompok Tani'], ['sengketa', 'Sengketa Transfer', 'disputed'], ['integritas', 'Integritas Blockchain'], ['konfigurasi', 'Konfigurasi'], ['audit', 'Audit Log']],
 };
 
 NAV.kelompok_tani = [['portal', 'Beranda Kelompok'], ['laporan', 'Laporan']];
@@ -76,6 +89,11 @@ const ADD = {
 };
 for (const [k, v] of Object.entries(ADD)) NAV[k].push(...v);
 for (const k of Object.keys(NAV)) NAV[k].push(['profil', 'Profil & Keamanan']);
+// Fitur lanjutan yang dimatikan secara bawaan (mode pilot). Dinyalakan lewat FEATURES di .env; daftar aktif datang dari /api/me (me.features).
+const FEATURE_OF = { prediksi: 'prediksi', copilot: 'copilot', email: 'email', integrasi: 'integrasi' };
+const navFor = (role) => (NAV[role] || []).filter((n) => !FEATURE_OF[n[0]] || (me.features || []).includes(FEATURE_OF[n[0]]));
+// Alamat lama yang sudah digabung ke halaman bertab.
+const LEGACY_ROUTE = { anomali: 'dashboard/anomali', tren: 'dashboard/tren', tracelog: 'dashboard/tracelog', 'mode-tindak': 'mode/tindak', 'mode-lihat': 'mode/lihat' };
 
 // ---------- sesi ----------
 function logout(done, why) {
@@ -102,32 +120,32 @@ async function leaveMode(force) {
 
 // ---------- layout ----------
 async function renderApp() {
-  const role = me.role, nav = NAV[role] || []; const act = ss.get('lp_act'), view = ss.get('lp_view');
+  const role = me.role, nav = navFor(role); const act = ss.get('lp_act'), view = ss.get('lp_view');
   if (act && me.act === null && me.user.role === 'superadmin') { ss.set('lp_act', null); }
   let counts = {};
   if (['admin', 'superadmin'].includes(role)) { try { counts = { pending: (await api('/api/verifications')).length, disputed: (await api('/api/transfers?box=disputed')).filter((t) => t.status === 'disputed').length }; } catch {} }
   const svcBan = (me.service && !me.service.open && !['admin', 'superadmin', 'pengawas'].includes(me.user.role)) ? `<div class="ban">Pencatatan baru sedang dijeda: ${esc(me.service.reason)} Anda tetap bisa melihat data.</div>` : '';
   const banner = me.act ? `<div class="ban">Mode Tindak aktif · bertindak sebagai ${esc(ROLE[me.act.role])} · ${esc(me.actor?.name)} · berakhir <b id="cd"></b><span class="small" style="color:#5a4300">Alasan: ${esc(me.act.reason)}</span><button class="btn sm" onclick="leaveMode()">Keluar Mode Tindak</button></div>` : me.readOnly ? `<div class="ban view">Mode Lihat · melihat sebagai ${esc(ROLE[me.role])} · ${esc(me.actor?.name)} · baca-saja, tercatat di audit log<button class="btn sm" onclick="leaveMode()">Keluar Mode Lihat</button></div>` : '';
   $('#root').innerHTML = `<div class="app" id="app"><div class="side" id="side"><div class="brand"><img src="/assets/img/emblem.png" alt=""><div><b>Lestari<span>Pangan</span></b><small>Traceability pangan</small></div></div><div class="sec">${esc(ROLE[role])}</div>
-  ${nav.map((n) => `<a class="nav" href="#/${n[0]}" data-r="${n[0]}"><i></i>${esc(n[1])}${n[2] && counts[n[2]] ? `<span class="badge">${counts[n[2]]}</span>` : ''}</a>`).join('')}
+  ${navHtml(nav, role, counts)}
   <div class="foot">${esc(me.store)}<br>Ledger: ${esc(me.network)}<br>Analitik: ${me.ai === 'claude' ? 'Claude' : 'berbasis aturan'}</div></div>
-  <div class="scrim" id="scrim"></div><div class="col"><div class="top"><button class="menu-btn" id="menu" type="button" aria-label="Buka menu" aria-expanded="false" aria-controls="side"><i></i><i></i><i></i></button><h1 id="ttl"></h1><span class="demo">DATA SIMULASI</span><div class="sp"></div><div style="position:relative"><button class="bell" id="bell" title="Notifikasi">&#128276;<b id="bn" style="display:none"></b></button><div class="pop" id="pop" style="display:none"></div></div>
+  <div class="scrim" id="scrim"></div><div class="col"><div class="top"><button class="menu-btn" id="menu" type="button" aria-label="Buka menu" aria-expanded="false" aria-controls="side"><i></i><i></i><i></i></button><h1 id="ttl"></h1>${me.simulation ? '<span class="demo">DATA SIMULASI</span>' : ''}<div class="sp"></div><div style="position:relative"><button class="bell" id="bell" type="button" title="Notifikasi" aria-label="Notifikasi" aria-haspopup="true">${ic('bell')}<b id="bn" style="display:none"></b></button><div class="pop" id="pop" style="display:none"></div></div>
   <div class="user"><div class="av">${esc(me.user.name.split(' ').map((w) => w[0]).slice(0, 2).join(''))}</div><div>${esc(me.actor?.name || me.user.name)}<small>${esc(me.act ? 'Mode Tindak (' + me.user.name + ')' : ROLE[me.user.role])}</small></div></div><button class="btn sm" id="lo" type="button">Keluar</button></div>
   ${svcBan}${banner}<div class="main" id="main"></div></div></div>`;
   const appEl = $('#app'), setNav = (o) => { appEl.classList.toggle('nav-open', o); $('#menu').setAttribute('aria-expanded', o); $('#menu').setAttribute('aria-label', o ? 'Tutup menu' : 'Buka menu'); };
   $('#menu').onclick = () => setNav(!appEl.classList.contains('nav-open')); $('#scrim').onclick = () => setNav(false); $('#lo').onclick = requestLogout;
   $('#side').addEventListener('click', (e) => { if (e.target.closest('.nav')) setNav(false); }); document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setNav(false); });
   if (me.act) { const tick = () => { const s = me.act.exp - Math.floor(Date.now() / 1000); if (s <= 0) { toast('Mode Tindak berakhir', true); leaveMode(true); return; } const el = $('#cd'); if (el) el.textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }; tick(); setInterval(tick, 1000); }
-  $('#bell').onclick = guard(async () => { const p = $('#pop'); if (p.style.display === 'block') { p.style.display = 'none'; return; } const ns = await api('/api/notifications'); p.innerHTML = ns.length ? ns.map((n) => `<div class="n">${esc(n.text)}<small>${dt(n.at)} · ${n.delivery === 'manual' ? 'pemberitahuan manual (dalam aplikasi)' : 'antrean email'}</small></div>`).join('') : '<div class="empty">Belum ada notifikasi</div>'; p.style.display = 'block'; await api('/api/notifications/read', { method: 'POST' }); $('#bn').style.display = 'none'; });
+  $('#bell').onclick = guard(async () => { const p = $('#pop'); if (p.style.display === 'block') { p.style.display = 'none'; return; } const ns = await api('/api/notifications'); p.innerHTML = ns.length ? ns.map((n) => `<div class="n">${esc(n.text)}<small>${dt(n.at)} · ${n.delivery === 'manual' ? 'pemberitahuan manual (dalam aplikasi)' : 'antrean email'}</small></div>`).join('') : '<div class="empty in">Belum ada notifikasi</div>'; p.style.display = 'block'; await api('/api/notifications/read', { method: 'POST' }); $('#bn').style.display = 'none'; });
   api('/api/notifications').then((ns) => { const u = ns.filter((n) => !n.read).length; if (u) { const b = $('#bn'); b.textContent = u; b.style.display = 'block'; } }).catch(() => {});
   window.onhashchange = route; route();
 }
 async function route() {
-  const parts = location.hash.replace(/^#\//, '').split('/'); const nav = NAV[me.role] || []; let id = parts[0] || nav[0][0]; const param = parts.slice(1).join('/');
+  const parts = location.hash.replace(/^#\//, '').split('/'); const nav = navFor(me.role); const lg = LEGACY_ROUTE[parts[0]]; if (lg && nav.some((n) => n[0] === lg.split('/')[0])) { location.replace('#/' + lg); return; } let id = parts[0] || nav[0][0]; const param = parts.slice(1).join('/');
   if (id !== 'batch-detail' && !nav.find((n) => n[0] === id) && id !== 'detail') id = nav[0][0];
   curRoute = id; document.querySelectorAll('.nav').forEach((a) => a.classList.toggle('on', a.dataset.r === (id === 'detail' ? 'batch' : id)));
   const label = (nav.find((n) => n[0] === id) || [0, id === 'detail' ? 'Detail Batch' : ''])[1]; $('#ttl').textContent = label;
-  const main = $('#main'); main.innerHTML = '<div class="empty">Memuat…</div>';
+  const main = $('#main'); main.innerHTML = '<div class="empty in">Memuat…</div>';
   try { await (S[(me.role === 'superadmin' ? 'sa:' : '') + id] || S[id] || S.__no)(main, param); } catch (e) { main.innerHTML = `<div class="card"><div class="empty">${esc(e.message)}</div></div>`; }
 }
 const go = (h) => { location.hash = h; };

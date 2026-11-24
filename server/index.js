@@ -6,7 +6,7 @@ const PUB = path.join(__dirname, '..', 'public'), DATA = require('./paths').DATA
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.ttf': 'font/ttf', '.json': 'application/json', '.ico': 'image/x-icon' };
 
 async function start({ port = +process.env.PORT || 3000, dataDir = DATA, seed = true } = {}) {
-  const store = await openStore(dataDir); const D = createDomain(store); const A = createAnalytics(D); A.storeKind = store.kind;
+  const store = await openStore(dataDir); const D = createDomain(store); const A = createAnalytics(D); A.storeKind = store.kind; D.retention = require('./retention')(D);
   if (seed && (await store.isEmpty())) {
     if (process.env.SEED_DEMO === '0') { // produksi: hanya satu akun super admin dari ADMIN_EMAIL / ADMIN_PASSWORD
       const em = String(process.env.ADMIN_EMAIL || '').toLowerCase().trim(), pw = String(process.env.ADMIN_PASSWORD || '');
@@ -63,9 +63,9 @@ async function start({ port = +process.env.PORT || 3000, dataDir = DATA, seed = 
     }
   });
   const HOST = process.env.HOST || undefined; await new Promise((r) => (HOST ? server.listen(port, HOST, r) : server.listen(port, r)));
-  const timer = setInterval(() => { D.processOutbox().catch(() => {}); D.ops.processEmails().catch(() => {}); }, 30000); timer.unref();
+  const stopRetention = D.retention.schedule(); const timer = setInterval(() => { D.processOutbox().catch(() => {}); D.ops.processEmails().catch(() => {}); }, 30000); timer.unref();
   console.log(`LestariPangan berjalan di http://${HOST || 'localhost'}:${server.address().port}  · data: ${store.kind}`);
-  return { server, D, store, close: () => new Promise((r) => { clearInterval(timer); store.flush(); server.close(r); }) };
+  return { server, D, store, close: () => new Promise((r) => { clearInterval(timer); stopRetention(); store.flush(); server.close(r); }) };
 }
 module.exports = { start };
 if (require.main === module) start().catch((e) => { console.error(e); process.exit(1); });

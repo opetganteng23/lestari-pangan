@@ -15,7 +15,7 @@ S.prediksi = async (m) => {
   const f = ss.get('lp_pf') || { tab: 'proyeksi', scope: 'total' }; const save = (p) => { ss.set('lp_pf', { ...f, ...p }); reload(); };
   const tabs = [['proyeksi', 'Proyeksi'], ['monitor', 'Pemantauan model'], ['twin', 'Digital Twin']];
   const head = `<div class="tabs">${tabs.map(([k, l]) => `<button data-tab="${k}" class="${f.tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>`;
-  m.innerHTML = head + '<div id="pt"><div class="empty">Memuat…</div></div>'; m.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => save({ tab: b.dataset.tab })));
+  m.innerHTML = head + '<div id="pt"><div class="empty in">Memuat…</div></div>'; m.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => save({ tab: b.dataset.tab })));
   const el = $('#pt');
   if (f.tab === 'proyeksi') {
     const ds = await api('/api/predict/districts'); const q = '?scope=' + encodeURIComponent(f.scope) + (f.preview ? '&preview=1' : ''); const r = await api('/api/predict/forecast' + q); const rd = r.readiness || (await api('/api/predict/readiness?scope=' + encodeURIComponent(f.scope)));
@@ -46,6 +46,8 @@ S.prediksi = async (m) => {
         : s === 'delay' ? fld('route', 'Rute transfer', { type: 'select', options: trs.map((e) => `<option value="${esc(e.from)}|${esc(e.to)}">${esc(nm[e.from])} → ${esc(nm[e.to])}</option>`).join('') }) + fld('extraHours', 'Tambahan waktu (jam)', { type: 'number', value: 24, min: 1 })
           : sel('nodeId', 'Pelaku', nodes) + fld('capacityPct', 'Kapasitas (% dari volume historis)', { type: 'number', value: 50, min: 0 }); };
     $('[name=scenario]').onchange = draw; draw();
+    const hist = async () => { try { const hs = await api('/api/twin/simulations'); const box = $('#shist'); if (box) box.innerHTML = '<h2>Riwayat simulasi</h2>' + (hs.length ? '<div class="tw"><table><tr><th>Waktu</th><th>Oleh</th><th>Skenario</th><th>Parameter</th></tr>' + hs.slice(0, 10).map((x) => '<tr><td>' + dt(x.at) + '</td><td>' + esc(x.by || '-') + '</td><td>' + esc(x.result?.label || x.scenario) + '</td><td class="small">' + Object.entries(x.parameters || {}).map(([k, v]) => esc(k) + ': ' + esc(v)).join(' · ') + '</td></tr>').join('') + '</table></div>' : '<div class="empty">Belum ada simulasi dijalankan</div>'); } catch { /* riwayat tidak wajib */ } };
+    el.insertAdjacentHTML('beforeend', '<div class="card" id="shist" style="margin-top:16px"></div>'); hist();
     $('#sf').onsubmit = guard(async (e) => { e.preventDefault(); const fd = Object.fromEntries(new FormData(e.target)); if (fd.route) { [fd.fromId, fd.toId] = fd.route.split('|'); delete fd.route; } const r = await api('/api/twin/simulate', { method: 'POST', body: fd });
       $('#sr').innerHTML = `<div class="ai"><h2>${esc(r.label)}</h2><h3>Parameter</h3><div class="small">${Object.entries(r.parameters).map(([k, v]) => `${esc(k)}: <b>${esc(v)}</b>`).join(' · ')}</div><h3>Hasil</h3><pre class="mono" style="white-space:pre-wrap;font-size:12px">${esc(JSON.stringify(r.result, null, 2))}</pre><h3>Asumsi</h3><ul style="margin-left:18px">${r.assumptions.map((a) => `<li class="small">${esc(a)}</li>`).join('')}</ul><p class="small">Sumber: ${esc(r.sourceData.note)}</p></div>`; });
   }
