@@ -3,7 +3,7 @@
 const fs = require('fs'), path = require('path');
 const origin = String(process.argv[2] || '').replace(/\/+$/, '');
 if (!/^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(origin)) { console.error('Beri alamat backend berbentuk https://host (tanpa path), mis. https://lestari-api.contoh.id'); process.exit(1); }
-const csp = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
+const csp = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://tile.openstreetmap.org; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
 const cfg = {
   framework: null, buildCommand: '', installCommand: '', outputDirectory: 'public', cleanUrls: false,
   rewrites: [

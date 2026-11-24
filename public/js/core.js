@@ -53,6 +53,11 @@ function openModal({ title, body, submit = 'Simpan', onSubmit, cancel = 'Batal',
   return { close, el: bg };
 }
 const fld = (name, label, o = {}) => `<label class="f">${label}</label>${o.type === 'select' ? `<select class="inp" name="${name}" ${o.required === false ? '' : 'required'}>${o.options}</select>` : o.type === 'textarea' ? `<textarea class="inp" name="${name}" rows="3" ${o.required === false ? '' : 'required'} placeholder="${esc(o.ph || '')}"></textarea>` : `<input class="inp" name="${name}" type="${o.type || 'text'}" ${o.step ? `step="${o.step}"` : ''} ${o.required === false ? '' : 'required'} value="${esc(o.value ?? '')}" placeholder="${esc(o.ph || '')}" ${o.min ? `min="${o.min}"` : ''}>`}`;
+// Daftar wilayah resmi dari server (satu kali per sesi halaman). regionOpts() menghasilkan <option> dikelompokkan per provinsi.
+let _regions = null;
+const loadRegions = async () => (_regions ||= await api('/api/regions', { raw: true }));
+const regionOpts = (selected) => { const rs = _regions || [], last = String(selected || '').split(',').pop().trim(); const hit = rs.find((r) => r.name === last) || rs.find((r) => r.name === 'Kabupaten ' + last); const provs = [...new Set(rs.map((r) => r.province))];
+  return '<option value="">Pilih kabupaten / kota</option>' + provs.map((p) => `<optgroup label="${esc(p)}">${rs.filter((r) => r.province === p).map((r) => `<option value="${esc(r.name)}"${hit === r ? ' selected' : ''}>${esc(r.name)}</option>`).join('')}</optgroup>`).join(''); };
 const opts = (arr, v, l, ph) => (ph ? `<option value="">${esc(ph)}</option>` : '') + arr.map((x) => `<option value="${esc(x[v])}">${esc(typeof l === 'function' ? l(x) : x[l])}</option>`).join('');
 
 // ---------- navigasi per peran ----------
