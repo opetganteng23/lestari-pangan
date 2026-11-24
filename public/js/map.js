@@ -34,7 +34,7 @@ async function drawMap(root, pts) {
     if (touch) { el.addEventListener('touchstart', (e) => { if (e.touches && e.touches.length === 1) say('lp_mh_t', 'Gunakan dua jari untuk menggeser dan zoom peta'); }, { passive: true }); }
     else {
       let on = false; const set = (v) => { on = v; if (v) map.scrollWheelZoom.enable(); else map.scrollWheelZoom.disable(); if (v && hint) hint.classList.remove('show'); };
-      map.on('click', () => set(true)); el.addEventListener('focus', () => set(true)); el.addEventListener('blur', () => set(false)); el.addEventListener('mouseleave', () => { if (document.activeElement !== el) set(false); });
+      map.on('click', () => set(true)); el.addEventListener('focus', () => set(true)); el.addEventListener('blur', () => set(false)); el.addEventListener('mouseleave', () => set(false)); // selalu mati saat kursor keluar, walau peta masih terfokus (fokus tidak dipindah paksa agar keyboard tetap bekerja)
       el.addEventListener('mouseenter', () => { if (!on) say('lp_mh_d', 'Klik peta lalu scroll untuk zoom'); });
       el.addEventListener('wheel', () => { if (!on) say('lp_mh_d', 'Klik peta lalu scroll untuk zoom'); }, { passive: true });
     }
