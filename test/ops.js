@@ -9,6 +9,11 @@ const { start } = require('../server/index.js');
   const login = async (e) => (await call('/api/login', { method: 'POST', body: { email: e, password: 'lestari123' } })).j.token;
   const t = async (name, fn) => { try { await fn(); console.log('  ok  ', name); } catch (e) { fails++; console.log('  GAGAL', name, '→', e.message); } };
   const T = {}; for (const k of ['admin', 'pengawas', 'pengepul2', 'gudang1', 'retailer']) T[k] = await login(k + '@lestari.id');
+  await t('Neraca Massa: catatan ambang tidak pernah undefined, juga bila konfigurasi lama tak punya kuncinya', async () => {
+    const note = async () => (await call('/api/massbalance', { token: T.admin })).j.toleranceNote;
+    assert.match(await note(), /^Ambang 3%/); await s.D.col.appConfig.update({ _id: 'cfg' }, { massBalanceTolerancePct: undefined }); const old = (await s.D.col.appConfig.findOne({ _id: 'cfg' })); delete old.massBalanceTolerancePct; s.store.data.appConfig = [old];
+    const n = await note(); assert.ok(!/undefined|NaN/.test(n), n); assert.match(n, /^Ambang 3%/);
+  });
   // siapkan batch gabah di gudang1: kirim batch tersedia milik pengepul2
   const src = (await call('/api/batches', { token: T.pengepul2 })).j.find((b) => b.status === 'available' && b.kind === 'deposit');
   const gd = (await call('/api/actors?role=gudang', { token: T.pengepul2 })).j.find((a) => a.name.includes('Sinar'));
