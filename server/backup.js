@@ -21,9 +21,16 @@ function list(destRoot = defaultRoot(), limit = 5) {
     .map((d) => { try { return { name: d, at: JSON.parse(fs.readFileSync(path.join(destRoot, d, 'MANIFEST.json'), 'utf8')).at }; } catch { return { name: d, at: null }; } });
   return { dir: destRoot, items };
 }
+// Menghapus cadangan terlama, menyisakan "keep" terbaru. Hanya folder yang punya MANIFEST.json (buatan run()) yang disentuh.
+function prune(destRoot = defaultRoot(), keep = 14) {
+  if (!(keep >= 1) || !fs.existsSync(destRoot)) return { removed: [] };
+  const all = fs.readdirSync(destRoot).filter((d) => fs.existsSync(path.join(destRoot, d, 'MANIFEST.json'))).sort(); const removed = all.slice(0, Math.max(0, all.length - keep));
+  for (const d of removed) fs.rmSync(path.join(destRoot, d), { recursive: true, force: true });
+  return { removed };
+}
 function dirSize(p, depth = 0) {
   let t = 0; if (!fs.existsSync(p) || depth > 4) return 0;
   for (const e of fs.readdirSync(p, { withFileTypes: true })) { const f = path.join(p, e.name); try { t += e.isDirectory() ? dirSize(f, depth + 1) : fs.statSync(f).size; } catch {} }
   return t;
 }
-module.exports = { run, list, dirSize, defaultRoot };
+module.exports = { run, list, prune, dirSize, defaultRoot };
