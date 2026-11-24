@@ -62,21 +62,32 @@ S.konfigurasi = async (m) => { const c = await api('/api/config'); const ro = me
 S.audit = async (m) => { const a = await api('/api/audit'); m.innerHTML = `<div class="card"><h2>Audit log</h2><div class="tw"><table><tr><th>Waktu</th><th>Pengguna</th><th>Aksi</th><th>Rincian</th></tr>${a.map((x) => `<tr><td>${dt(x.at)}</td><td>${esc(x.userName || '-')}<div class="small">${esc(ROLE[x.role] || '')}</div></td><td><b>${esc(x.action)}</b>${x.act ? ` <span class="chip wait">Mode Tindak · ${esc(ROLE[x.act.role])}</span>` : ''}</td><td>${esc(x.detail)}</td></tr>`).join('')}</table></div></div>`; };
 
 // ---------- Pengawas ----------
-S.dashboard = async (m) => {
-  const d = await api('/api/dashboard'); const k = d.metrics; const wr = d.report;
-  m.innerHTML = `<div class="grid g5" style="margin-bottom:16px">${kpi('Batch aktif', k.batchActive, `${k.pengepulActive} pengepul · ${k.districts} kecamatan`, 'var(--g700)')}${kpi('Menunggu verifikasi', k.pending, `${k.overdue} melewati SLA`, k.overdue ? 'var(--amber)' : '')}${kpi('Transfer menggantung', k.hanging, 'menggantung atau bersengketa', k.hanging ? 'var(--red)' : '')}${kpi('Commit blockchain', k.anchorPct + '%', `${k.anchorFailed} gagal · ${k.anchorPending} antre`, 'var(--g700)')}${kpi('Rendemen rata-rata', k.yieldAvg + '%', 'dicatat sendiri')}</div>
-  <div class="grid g2"><div class="card"><h2>Peta sebaran</h2>${mapBox(d.points)}</div><div class="grid" style="align-content:start"><div class="ai"><h2>Ringkasan mingguan <span class="chip" style="background:#fff;color:#6b4a00;border:1px solid #F0D58A">${wr.source === 'claude' ? 'dibuat AI (Claude) dari data sistem' : 'dibuat otomatis dari data sistem (tanpa AI)'}</span></h2><ul>${wr.bullets.map((b) => `<li>${esc(b)}</li>`).join('')}</ul><p class="small">${dt(wr.at)} · angka dihitung kode${wr.note ? ' · ' + esc(wr.note) : ''}</p>${me.readOnly ? '' : `<button class="btn sm" id="rg" style="margin-top:6px">${ic('refresh')}Perbarui ringkasan</button>`}</div><div class="card"><h2>Anomali terbaru</h2>${anomTable(d.anomalies.slice(0, 6))}</div></div></div>`;
-  drawMap(m, d.points);
-  const rg = $('#rg'); if (rg) rg.onclick = guard(async () => { if (!(await askConfirm('Ringkasan baru dibuat dari data saat ini. Bila AI aktif, ini memakai kuota Anthropic.', { title: 'Buat ringkasan baru?', confirm: 'Ya, buat', danger: false }))) return; rg.disabled = true; await api('/api/analytics/run', { method: 'POST' }); reload(); });
+// Dashboard pengawasan satu halaman bertab: Ringkasan, Anomali, Tren Pasokan, Trace Log. Satu pemanggilan /api/dashboard untuk tiga tab pertama.
+// Alamat lama (#/anomali, #/tren, #/tracelog) dialihkan ke tab yang sesuai oleh route().
+const DASH_TABS = [['ringkasan', 'Ringkasan'], ['anomali', 'Anomali'], ['tren', 'Tren Pasokan'], ['tracelog', 'Trace Log']];
+const dashRingkasan = (d) => {
+  const k = d.metrics, wr = d.report;
+  return { html: `<div class="grid g5" style="margin-bottom:16px">${kpi('Batch aktif', k.batchActive, `${k.pengepulActive} pengepul · ${k.districts} kecamatan`, 'var(--g700)')}${kpi('Menunggu verifikasi', k.pending, `${k.overdue} melewati SLA`, k.overdue ? 'var(--amber)' : '')}${kpi('Transfer menggantung', k.hanging, 'menggantung atau bersengketa', k.hanging ? 'var(--red)' : '')}${kpi('Commit blockchain', k.anchorPct + '%', `${k.anchorFailed} gagal · ${k.anchorPending} antre`, 'var(--g700)')}${kpi('Rendemen rata-rata', k.yieldAvg + '%', 'dicatat sendiri')}</div>
+  <div class="grid g2"><div class="card"><h2>Peta sebaran</h2>${mapBox(d.points)}</div><div class="grid" style="align-content:start"><div class="ai"><h2>Ringkasan mingguan <span class="chip" style="background:#fff;color:#6b4a00;border:1px solid #F0D58A">${wr.source === 'claude' ? 'dibuat AI (Claude) dari data sistem' : 'dibuat otomatis dari data sistem (tanpa AI)'}</span></h2><ul>${wr.bullets.map((b) => `<li>${esc(b)}</li>`).join('')}</ul><p class="small">${dt(wr.at)} · angka dihitung kode${wr.note ? ' · ' + esc(wr.note) : ''}</p>${me.readOnly ? '' : `<button class="btn sm" id="rg" style="margin-top:6px">${ic('refresh')}Perbarui ringkasan</button>`}</div><div class="card"><h2>Anomali terbaru</h2>${anomTable(d.anomalies.slice(0, 6))}</div></div></div>`,
+  after: (m) => { drawMap(m, d.points); const rg = $('#rg'); if (rg) rg.onclick = guard(async () => { if (!(await askConfirm('Ringkasan baru dibuat dari data saat ini. Bila AI aktif, ini memakai kuota Anthropic.', { title: 'Buat ringkasan baru?', confirm: 'Ya, buat', danger: false }))) return; rg.disabled = true; await api('/api/analytics/run', { method: 'POST' }); reload(); }); } };
 };
-S.tracelog = async (m) => { const bs = await api('/api/batches'); let q = '';
+const dashAnomali = (d) => ({ html: `<div class="card"><h2>Anomali</h2>${anomTable(d.anomalies)}</div>` });
+const dashTren = (d) => {
+  const w = d.metrics.weeks, mx = Math.max(1, ...w.map((x) => x.kg)); const bw = 54;
+  return { html: `<div class="grid g21"><div class="card"><h2>Volume setoran per minggu (kg)</h2><svg viewBox="0 0 ${w.length * (bw + 12) + 20} 230" style="width:100%">${w.map((x, i) => { const h = (x.kg / mx) * 160; const X = 14 + i * (bw + 12); return `<rect x="${X}" y="${190 - h}" width="${bw}" height="${h}" rx="6" fill="#237A41"/><text x="${X + bw / 2}" y="${182 - h}" text-anchor="middle" font-size="10" font-family="Poppins" fill="#1C2B22">${x.kg ? x.kg.toLocaleString('id-ID') : ''}</text><text x="${X + bw / 2}" y="210" text-anchor="middle" font-size="10" font-family="Poppins" fill="#5F7066">${x.label}</text>`; }).join('')}</svg><p class="small">Setoran yang tidak ditolak, per minggu terakhir.</p></div>
+  <div class="card"><h2>Status setoran</h2>${kpi('Terverifikasi admin', d.metrics.verified, '')}<div style="height:8px"></div>${kpi('Diterima otomatis (sampling)', d.metrics.autoAccepted, '')}<div style="height:8px"></div>${kpi('Ditolak', d.metrics.rejected, '', 'var(--red)')}</div></div>` };
+};
+const dashTrace = async () => {
+  const bs = await api('/api/batches'); let q = '';
   const draw = () => { const f = bs.filter((b) => !q || (b.code + (b.qrCode || '') + (b.meta?.lot || '') + (b.ownerName || '') + (b.groupName || '')).toLowerCase().includes(q.toLowerCase())); $('#tb').innerHTML = f.length ? `<div class="tw"><table><tr><th>Batch</th><th>Jenis</th><th>Berat</th><th>Pemilik</th><th>Status</th><th>QR / lot</th></tr>${f.map((b) => `<tr class="click" onclick="go('#/detail/${b._id}')"><td class="mono">${esc(b.code)}</td><td>${KIND[b.kind]}${b.groupName ? ' · ' + esc(b.groupName) : ''}</td><td>${kg(b.weightKg)}</td><td>${esc(b.ownerName)}</td><td>${chip(b.status)}</td><td class="mono">${esc(b.meta?.lot || b.qrCode || '-')}</td></tr>`).join('')}</table></div>` : '<div class="empty">Tidak ada hasil</div>'; };
-  m.innerHTML = `<div class="card"><h2>Trace log</h2><input class="inp" id="q" placeholder="Cari kode batch, kode QR, nomor lot, pemilik, atau kelompok tani…" style="margin-bottom:12px"><div id="tb"></div></div>`; $('#q').oninput = (e) => { q = e.target.value; draw(); }; draw(); };
-S.anomali = async (m) => { const d = await api('/api/dashboard'); m.innerHTML = `<div class="card"><h2>Anomali</h2>${anomTable(d.anomalies)}</div>`; };
-S.tren = async (m) => {
-  const d = await api('/api/dashboard'); const w = d.metrics.weeks, mx = Math.max(1, ...w.map((x) => x.kg)); const bw = 54;
-  m.innerHTML = `<div class="grid g21"><div class="card"><h2>Volume setoran per minggu (kg)</h2><svg viewBox="0 0 ${w.length * (bw + 12) + 20} 230" style="width:100%">${w.map((x, i) => { const h = (x.kg / mx) * 160; const X = 14 + i * (bw + 12); return `<rect x="${X}" y="${190 - h}" width="${bw}" height="${h}" rx="6" fill="#237A41"/><text x="${X + bw / 2}" y="${182 - h}" text-anchor="middle" font-size="10" font-family="Poppins" fill="#1C2B22">${x.kg ? x.kg.toLocaleString('id-ID') : ''}</text><text x="${X + bw / 2}" y="210" text-anchor="middle" font-size="10" font-family="Poppins" fill="#5F7066">${x.label}</text>`; }).join('')}</svg><p class="small">Setoran yang tidak ditolak, per minggu terakhir.</p></div>
-  <div class="card"><h2>Status setoran</h2>${kpi('Terverifikasi admin', d.metrics.verified, '')}<div style="height:8px"></div>${kpi('Diterima otomatis (sampling)', d.metrics.autoAccepted, '')}<div style="height:8px"></div>${kpi('Ditolak', d.metrics.rejected, '', 'var(--red)')}</div></div>`;
+  return { html: `<div class="card"><h2>Trace log</h2><input class="inp" id="q" placeholder="Cari kode batch, kode QR, nomor lot, pemilik, atau kelompok tani…" style="margin-bottom:12px"><div id="tb"></div></div>`, after: () => { $('#q').oninput = (e) => { q = e.target.value; draw(); }; draw(); } };
+};
+S.dashboard = async (m, param) => {
+  const tab = DASH_TABS.some((t) => t[0] === param) ? param : 'ringkasan';
+  const r = tab === 'tracelog' ? await dashTrace() : await { ringkasan: dashRingkasan, anomali: dashAnomali, tren: dashTren }[tab](await api('/api/dashboard'));
+  m.innerHTML = `<div class="tabs" style="margin-bottom:14px">${DASH_TABS.map((t) => `<button type="button" data-dt="${t[0]}" class="${t[0] === tab ? 'on' : ''}">${t[1]}</button>`).join('')}</div>${r.html}`;
+  m.querySelectorAll('[data-dt]').forEach((b) => (b.onclick = () => go('#/dashboard/' + (b.dataset.dt === 'ringkasan' ? '' : b.dataset.dt))));
+  if (r.after) r.after(m);
 };
 
 // ---------- Super admin ----------
@@ -92,6 +103,14 @@ S['mode-lihat'] = async (m) => {
   m.innerHTML = `<div class="card" style="max-width:560px"><h2>Mode Lihat</h2><p class="small">Melihat aplikasi persis seperti pelaku tertentu, tanpa bisa mengubah apa pun. Setiap pergantian tercatat di audit log.</p><form id="vf">${fld('role', 'Peran', { type: 'select', options: roles.map((r) => `<option value="${r}">${ROLE[r]}</option>`).join('') })}${fld('actorId', 'Pelaku', { type: 'select', options: '' })}<div class="btns" style="margin-top:14px"><button class="btn pri">Lihat sebagai pelaku ini</button></div></form></div>`;
   const fill = () => { $('[name=actorId]').innerHTML = opts(actors.filter((a) => a.role === $('[name=role]').value), '_id', (a) => `${a.name} (${a.district || '-'})`); }; $('[name=role]').onchange = fill; fill();
   $('#vf').onsubmit = guard(async (e) => { e.preventDefault(); const fd = Object.fromEntries(new FormData(e.target)); await api('/api/sa/view', { method: 'POST', body: { actorId: fd.actorId } }); ss.set('lp_act', null); ss.set('lp_view', { actorId: fd.actorId }); location.hash = '#/'; location.reload(); });
+};
+
+// Mode Tindak dan Mode Lihat dalam satu halaman bertab (#/mode/tindak, #/mode/lihat).
+S.mode = async (m, param) => {
+  const tab = param === 'lihat' ? 'lihat' : 'tindak';
+  m.innerHTML = `<div class="tabs" style="margin-bottom:14px">${[['tindak', 'Mode Tindak (bertindak atas nama)'], ['lihat', 'Mode Lihat (baca-saja)']].map((t) => `<button type="button" data-mt="${t[0]}" class="${t[0] === tab ? 'on' : ''}">${t[1]}</button>`).join('')}</div><div id="mbox"></div>`;
+  m.querySelectorAll('[data-mt]').forEach((b) => (b.onclick = () => go('#/mode/' + b.dataset.mt)));
+  await S['mode-' + tab](m.querySelector('#mbox'));
 };
 
 // ---------- Pengguna (CRUD, admin) ----------

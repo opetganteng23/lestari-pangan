@@ -1,5 +1,5 @@
 const fs = require('fs'), path = require('path'), crypto = require('crypto');
-const auth = require('./auth'); const qr = require('./qr'); const sec = require('./security');
+const auth = require('./auth'); const sec = require('./security');
 const UP = path.join(require('./paths').DATA, 'uploads'); fs.mkdirSync(UP, { recursive: true });
 
 module.exports = function build(D, A) {
@@ -7,6 +7,8 @@ module.exports = function build(D, A) {
   const add = (method, p, fn, o = {}) => R.push({ method, re: new RegExp('^' + p.replace(/:(\w+)/g, '(?<$1>[^/]+)') + '$'), fn, ...o });
   const ACTOR_ROLES = ['pengepul', 'gudang', 'distributor', 'logistik', 'retailer'];
   const MFA = require('./mfa')(D); const REG = require('./regions');
+  // Fitur lanjutan yang tampil di menu. Bawaan (mode pilot): semuanya mati. Nyalakan: FEATURES=prediksi,copilot,email,integrasi
+  const FEATURES = () => String(process.env.FEATURES || '').split(',').map((x) => x.trim().toLowerCase()).filter((x) => ['prediksi', 'copilot', 'email', 'integrasi'].includes(x));
   // izin: superadmin asli (tanpa act/view) memiliki fitur admin + pengawas
   function need(ctx, roles, write) {
     if (write && ctx.readOnly) throw forbid('Mode Lihat: hanya baca. Masuk Mode Tindak untuk bertindak.');
@@ -66,7 +68,7 @@ module.exports = function build(D, A) {
   const pubUser = (u) => ({ _id: u._id, name: u.name, email: u.email, role: u.role, actorId: u.actorId, groupId: u.groupId || null });
 
   // ----- sesi -----
-  add('GET', '/api/me', async (c) => ({ user: pubUser(c.user), role: c.role, actor: c.actor, group: c.group ? { _id: c.group._id, name: c.group.name, district: c.group.district } : null, service: D.serverctl.gateState(await D.serverctl.getGate()), act: c.act ? { role: c.act.role, actorId: c.act.actorId, reason: c.act.reason, exp: c.act.exp } : null, readOnly: !!c.readOnly, mfa: c.user.role === 'superadmin' ? { enabled: MFA.enabled(c.user), recoveryLeft: MFA.recoveryLeft(c.user) } : null, config: await D.cfg(), simulation: process.env.SEED_DEMO !== '0' || process.env.DEMO_MODE !== '0', store: A.storeKind, network: require('./ledger').network, ai: process.env.ANTHROPIC_API_KEY ? 'claude' : 'rules' }));
+  add('GET', '/api/me', async (c) => ({ user: pubUser(c.user), role: c.role, actor: c.actor, group: c.group ? { _id: c.group._id, name: c.group.name, district: c.group.district } : null, service: D.serverctl.gateState(await D.serverctl.getGate()), act: c.act ? { role: c.act.role, actorId: c.act.actorId, reason: c.act.reason, exp: c.act.exp } : null, readOnly: !!c.readOnly, mfa: c.user.role === 'superadmin' ? { enabled: MFA.enabled(c.user), recoveryLeft: MFA.recoveryLeft(c.user) } : null, config: await D.cfg(), simulation: process.env.SEED_DEMO !== '0' || process.env.DEMO_MODE !== '0', features: FEATURES(), store: A.storeKind, network: require('./ledger').network, ai: process.env.ANTHROPIC_API_KEY ? 'claude' : 'rules' }));
   add('GET', '/api/actors', async (c) => { const f = c.query.role ? { role: c.query.role } : {}; return (await col.actors.find(f)).map((a) => ({ _id: a._id, name: a.name, role: a.role, district: a.district, lat: a.lat, lng: a.lng })); });
 
   // ----- super admin -----
@@ -219,7 +221,6 @@ module.exports = function build(D, A) {
   });
 
   // ----- QR -----
-  add('GET', '/api/qr', async (c) => ({ svg: qr.svg(c.query.text || '') }), { public: true });
   const rc = { D, add, need, ACTOR_ROLES, bad, notFound, forbid, conflict, sec, auth, names, pubUser, MFA }; require('./routes-mfa')(rc); require('./routes-ops')(rc); require('./routes-partner')(rc); require('./routes-server')(rc); require('./routes-auth')(rc);
   return R;
 };

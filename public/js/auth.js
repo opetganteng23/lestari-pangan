@@ -5,7 +5,6 @@ const AUTH_VIEWS = ['masuk', 'daftar', 'lupa', 'reset'];
 
 function authHashView() { const h = location.hash.replace(/^#\/?/, ''); const [v, ...p] = h.split('/'); return { view: AUTH_VIEWS.includes(v) ? v : 'masuk', param: p.join('/') }; }
 function renderAuthFromHash() { const { view, param } = authHashView(); if (!location.hash.startsWith('#/' + view)) history.replaceState(null, '', '#/' + view); return renderAuth(view, param); }
-function renderLogin() { return renderAuthFromHash(); }
 
 function pwScore(p) { let s = 0; if (p.length >= 8) s++; if (/[A-Za-z]/.test(p) && /\d/.test(p)) s++; if (p.length >= 12) s++; if (/[^A-Za-z0-9]/.test(p)) s++; return s; }
 const pwField = (name, label, auto, extra = '') => `<div class="af" style="--i:var(--n)"><label for="f_${name}">${label}</label><div class="pw"><input id="f_${name}" class="inp" name="${name}" type="password" required autocomplete="${auto}" ${extra}><button type="button" class="eye" data-eye aria-label="Tampilkan kata sandi" aria-pressed="false">${AUTH_ICON.eye}</button></div></div>`;

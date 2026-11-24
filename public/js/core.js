@@ -63,9 +63,9 @@ const opts = (arr, v, l, ph) => (ph ? `<option value="">${esc(ph)}</option>` : '
 // ---------- navigasi per peran ----------
 // ---------- ikon (sprite lokal /assets/icons.svg) ----------
 const ic = (n, cls) => '<svg class="ic' + (cls ? ' ' + cls : '') + '" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#i-' + n + '"/></svg>';
-const NAV_IC = { beranda: 'home', portal: 'home', 'setoran-baru': 'plus-circle', setoran: 'clipboard', batch: 'package', kirim: 'truck', kiriman: 'truck', label: 'qr', terima: 'inbox', kemasan: 'box', verifikasi: 'shield-check', pengguna: 'users', pelaku: 'badge', kelompok: 'sprout', sengketa: 'scale', integritas: 'link', konfigurasi: 'sliders', audit: 'file', dashboard: 'grid', tracelog: 'route', anomali: 'alert', tren: 'trend', server: 'server', prediksi: 'chart', integrasi: 'plug', kasus: 'folder-search', risiko: 'gauge', neraca: 'scale', laporan: 'download', email: 'mail', copilot: 'sparkles', profil: 'user', 'mode-tindak': 'zap', 'mode-lihat': 'eye' };
+const NAV_IC = { beranda: 'home', portal: 'home', 'setoran-baru': 'plus-circle', setoran: 'clipboard', batch: 'package', kirim: 'truck', kiriman: 'truck', label: 'qr', terima: 'inbox', kemasan: 'box', verifikasi: 'shield-check', pengguna: 'users', pelaku: 'badge', kelompok: 'sprout', sengketa: 'scale', integritas: 'link', konfigurasi: 'sliders', audit: 'file', dashboard: 'grid', tracelog: 'route', anomali: 'alert', tren: 'trend', server: 'server', prediksi: 'chart', integrasi: 'plug', kasus: 'folder-search', risiko: 'gauge', neraca: 'scale', laporan: 'download', email: 'mail', copilot: 'sparkles', profil: 'user', 'mode-tindak': 'zap', 'mode-lihat': 'eye', mode: 'zap' };
 // Pengelompokan menu per seksi. Peran pelaku rantai pasok hanya punya satu seksi (Operasional) dan Akun.
-const NAV_SEC = { verifikasi: 'Pengawasan', sengketa: 'Pengawasan', dashboard: 'Pengawasan', tracelog: 'Pengawasan', anomali: 'Pengawasan', tren: 'Pengawasan', integritas: 'Pengawasan', kasus: 'Pengawasan', risiko: 'Pengawasan', neraca: 'Pengawasan', laporan: 'Pengawasan', 'mode-lihat': 'Pengawasan', pengguna: 'Administrasi', pelaku: 'Administrasi', kelompok: 'Administrasi', konfigurasi: 'Administrasi', audit: 'Administrasi', 'mode-tindak': 'Administrasi', server: 'Lanjutan', prediksi: 'Lanjutan', integrasi: 'Lanjutan', email: 'Lanjutan', copilot: 'Lanjutan', profil: 'Akun' };
+const NAV_SEC = { verifikasi: 'Pengawasan', sengketa: 'Pengawasan', dashboard: 'Pengawasan', tracelog: 'Pengawasan', anomali: 'Pengawasan', tren: 'Pengawasan', integritas: 'Pengawasan', kasus: 'Pengawasan', risiko: 'Pengawasan', neraca: 'Pengawasan', laporan: 'Pengawasan', mode: 'Administrasi', pengguna: 'Administrasi', pelaku: 'Administrasi', kelompok: 'Administrasi', konfigurasi: 'Administrasi', audit: 'Administrasi', 'mode-tindak': 'Administrasi', server: 'Lanjutan', prediksi: 'Lanjutan', integrasi: 'Lanjutan', email: 'Lanjutan', copilot: 'Lanjutan', profil: 'Akun' };
 const SEC_ORDER = ['Operasional', 'Pengawasan', 'Administrasi', 'Lanjutan', 'Akun'];
 const secOf = (id, role) => (id === 'profil' ? 'Akun' : ['pengepul', 'gudang', 'distributor', 'logistik', 'retailer', 'kelompok_tani'].includes(role) ? 'Operasional' : NAV_SEC[id] || 'Operasional');
 const navHtml = (nav, role, counts) => { let cur = '', out = ''; for (const n of SEC_ORDER.flatMap((s) => nav.filter((x) => secOf(x[0], role) === s))) { const s = secOf(n[0], role); if (s !== cur) { cur = s; out += '<div class="nsec">' + s + '</div>'; } out += '<a class="nav" href="#/' + n[0] + '" data-r="' + n[0] + '">' + ic(NAV_IC[n[0]] || 'grid') + '<span>' + esc(n[1]) + '</span>' + (n[2] && counts[n[2]] ? '<span class="badge">' + counts[n[2]] + '</span>' : '') + '</a>'; } return out; };
@@ -76,8 +76,8 @@ const NAV = {
   logistik: [['beranda', 'Beranda'], ['kiriman', 'Kiriman Saya']],
   retailer: [['beranda', 'Beranda'], ['terima', 'Terima Barang'], ['batch', 'Stok & Asal Produk']],
   admin: [['beranda', 'Beranda'], ['verifikasi', 'Antrean Verifikasi', 'pending'], ['pengguna', 'Pengguna'], ['pelaku', 'Pelaku & Kode Referral'], ['kelompok', 'Kelompok Tani'], ['sengketa', 'Sengketa Transfer', 'disputed'], ['integritas', 'Integritas Blockchain'], ['konfigurasi', 'Konfigurasi'], ['audit', 'Audit Log']],
-  pengawas: [['dashboard', 'Dashboard'], ['tracelog', 'Trace Log'], ['anomali', 'Anomali'], ['tren', 'Tren Pasokan'], ['integritas', 'Integritas Blockchain'], ['audit', 'Audit Log']],
-  superadmin: [['mode-tindak', 'Mode Tindak'], ['mode-lihat', 'Mode Lihat'], ['dashboard', 'Dashboard Pengawasan'], ['verifikasi', 'Antrean Verifikasi', 'pending'], ['pengguna', 'Pengguna'], ['pelaku', 'Pelaku & Kode Referral'], ['kelompok', 'Kelompok Tani'], ['sengketa', 'Sengketa Transfer', 'disputed'], ['tracelog', 'Trace Log'], ['anomali', 'Anomali'], ['tren', 'Tren Pasokan'], ['integritas', 'Integritas Blockchain'], ['konfigurasi', 'Konfigurasi'], ['audit', 'Audit Log']],
+  pengawas: [['dashboard', 'Dashboard'], ['integritas', 'Integritas Blockchain'], ['audit', 'Audit Log']],
+  superadmin: [['mode', 'Mode Tindak & Lihat'], ['dashboard', 'Dashboard Pengawasan'], ['verifikasi', 'Antrean Verifikasi', 'pending'], ['pengguna', 'Pengguna'], ['pelaku', 'Pelaku & Kode Referral'], ['kelompok', 'Kelompok Tani'], ['sengketa', 'Sengketa Transfer', 'disputed'], ['integritas', 'Integritas Blockchain'], ['konfigurasi', 'Konfigurasi'], ['audit', 'Audit Log']],
 };
 
 NAV.kelompok_tani = [['portal', 'Beranda Kelompok'], ['laporan', 'Laporan']];
@@ -89,6 +89,11 @@ const ADD = {
 };
 for (const [k, v] of Object.entries(ADD)) NAV[k].push(...v);
 for (const k of Object.keys(NAV)) NAV[k].push(['profil', 'Profil & Keamanan']);
+// Fitur lanjutan yang dimatikan secara bawaan (mode pilot). Dinyalakan lewat FEATURES di .env; daftar aktif datang dari /api/me (me.features).
+const FEATURE_OF = { prediksi: 'prediksi', copilot: 'copilot', email: 'email', integrasi: 'integrasi' };
+const navFor = (role) => (NAV[role] || []).filter((n) => !FEATURE_OF[n[0]] || (me.features || []).includes(FEATURE_OF[n[0]]));
+// Alamat lama yang sudah digabung ke halaman bertab.
+const LEGACY_ROUTE = { anomali: 'dashboard/anomali', tren: 'dashboard/tren', tracelog: 'dashboard/tracelog', 'mode-tindak': 'mode/tindak', 'mode-lihat': 'mode/lihat' };
 
 // ---------- sesi ----------
 function logout(done, why) {
@@ -115,7 +120,7 @@ async function leaveMode(force) {
 
 // ---------- layout ----------
 async function renderApp() {
-  const role = me.role, nav = NAV[role] || []; const act = ss.get('lp_act'), view = ss.get('lp_view');
+  const role = me.role, nav = navFor(role); const act = ss.get('lp_act'), view = ss.get('lp_view');
   if (act && me.act === null && me.user.role === 'superadmin') { ss.set('lp_act', null); }
   let counts = {};
   if (['admin', 'superadmin'].includes(role)) { try { counts = { pending: (await api('/api/verifications')).length, disputed: (await api('/api/transfers?box=disputed')).filter((t) => t.status === 'disputed').length }; } catch {} }
@@ -136,7 +141,7 @@ async function renderApp() {
   window.onhashchange = route; route();
 }
 async function route() {
-  const parts = location.hash.replace(/^#\//, '').split('/'); const nav = NAV[me.role] || []; let id = parts[0] || nav[0][0]; const param = parts.slice(1).join('/');
+  const parts = location.hash.replace(/^#\//, '').split('/'); const nav = navFor(me.role); const lg = LEGACY_ROUTE[parts[0]]; if (lg && nav.some((n) => n[0] === lg.split('/')[0])) { location.replace('#/' + lg); return; } let id = parts[0] || nav[0][0]; const param = parts.slice(1).join('/');
   if (id !== 'batch-detail' && !nav.find((n) => n[0] === id) && id !== 'detail') id = nav[0][0];
   curRoute = id; document.querySelectorAll('.nav').forEach((a) => a.classList.toggle('on', a.dataset.r === (id === 'detail' ? 'batch' : id)));
   const label = (nav.find((n) => n[0] === id) || [0, id === 'detail' ? 'Detail Batch' : ''])[1]; $('#ttl').textContent = label;
