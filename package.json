@@ -10,6 +10,7 @@
     "restore": "node scripts/restore.js",
     "demo:disable": "node scripts/disable-demo-accounts.js",
     "purge:test": "node scripts/purge-test-data.js",
+    "mfa:reset": "node scripts/reset-mfa.js",
     "reseed": "node -e \"require('fs').rmSync('data',{recursive:true,force:true})\" && node server/index.js",
     "init:env": "node scripts/init-env.js",
     "check:env": "node scripts/check-env.js",

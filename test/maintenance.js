@@ -55,5 +55,11 @@ const read = () => JSON.parse(fs.readFileSync(path.join(dir, 'db.json'), 'utf8')
       const ok = await fetch(base + '/api/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: 'owner@contoh.id', password: 'Rahasia123' }) }); assert.strictEqual(ok.status, 200, 'akun non-demo tetap bisa masuk');
     } finally { s3.server.close(); }
   });
+  await t('reset-mfa: menghapus MFA, mencabut sesi, mencatat audit; akun tanpa MFA tidak diubah', async () => {
+    const s4 = await start({ port: 0 }); const o = await s4.D.col.users.findOne({ email: 'owner@contoh.id' }); await s4.D.col.users.update({ _id: o._id }, { mfa: { enabled: true, secret: 'x.y.z', recovery: ['h'] } }); s4.D.store.flush(); s4.server.close();
+    const before = read().users.find((u) => u.email === 'owner@contoh.id').sv; const r = run('reset-mfa.js', 'owner@contoh.id'); assert.strictEqual(r.status, 0, r.stderr); const u = read().users.find((x) => x.email === 'owner@contoh.id');
+    assert.ok(!u.mfa); assert.strictEqual(u.sv, before + 1); assert.ok(read().auditLogs.some((l) => l.action === 'mfa.reset'));
+    const r2 = run('reset-mfa.js', 'owner@contoh.id'); assert.ok(r2.stdout.includes('belum aktif')); assert.strictEqual(read().users.find((x) => x.email === 'owner@contoh.id').sv, before + 1); assert.strictEqual(run('reset-mfa.js', 'tidak@ada.id').status, 1);
+  });
   console.log(fails ? `\n${fails} GAGAL` : '\nSemua lulus'); process.exit(fails ? 1 : 0);
 })();
