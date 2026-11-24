@@ -20,12 +20,27 @@ function regionTable(pts) {
   if (!rows.length) return '<div class="empty">Belum ada pelaku atau kelompok tani terdaftar</div>';
   return `<div class="tw"><table><tr><th>Wilayah</th>${types.map((t) => `<th>${esc(TCOL[t][1])}</th>`).join('')}<th>Anomali</th></tr>${rows.map(([r, v]) => `<tr><td>${esc(r)}${v.noLoc ? ` <span class="chip gray">${v.noLoc} tanpa lokasi</span>` : ''}</td>${types.map((t) => `<td>${v.n[t] || '-'}</td>`).join('')}<td>${v.flag ? `<span class="chip bad">${v.flag}</span>` : '-'}</td></tr>`).join('')}</table></div>`;
 }
-const mapBox = (pts) => `<div class="map"><div id="lmap" class="lmap" role="img" aria-label="Peta sebaran kelompok tani dan pelaku rantai pasok"></div></div><div class="legend">${Object.values(TCOL).map((c) => `<span><i style="background:${c[0]}"></i>${c[1]}</span>`).join('')}<span><i style="background:#fff;border:3px solid #C62F2F;width:6px;height:6px"></i>ada anomali</span></div><p class="small">Titik berada di pusat kabupaten / kota; titik berdekatan dikelompokkan, klik atau perbesar untuk memisahkan.</p><details id="mtab" style="margin-top:8px"><summary class="small" style="cursor:pointer">Rekap per wilayah</summary>${regionTable(pts)}</details>`;
+const mapBox = (pts) => `<div class="map"><div id="lmap" class="lmap" role="group" aria-label="Peta sebaran kelompok tani dan pelaku rantai pasok. Gunakan tombol plus dan minus atau tombol panah untuk zoom dan geser."></div><div id="mhint" class="map-hint" role="status" aria-live="polite"></div></div><div class="legend">${Object.values(TCOL).map((c) => `<span><i style="background:${c[0]}"></i>${c[1]}</span>`).join('')}<span><i style="background:#fff;border:3px solid #C62F2F;width:6px;height:6px"></i>ada anomali</span></div><p class="small">Titik berada di pusat kabupaten / kota; titik berdekatan dikelompokkan, klik atau perbesar untuk memisahkan.</p><details id="mtab" style="margin-top:8px"><summary class="small" style="cursor:pointer">Rekap per wilayah</summary>${regionTable(pts)}</details>`;
 async function drawMap(root, pts) {
   const open = (why) => { const d = root.querySelector && root.querySelector('#mtab'); if (d) d.open = true; const b = root.querySelector && root.querySelector('#lmap'); if (b && why) b.innerHTML = `<div class="empty" style="padding:28px 12px">${esc(why)}</div>`; };
   try {
     const el = root.querySelector('#lmap'); if (!el) return; await loadLeaflet();
-    const map = L.map(el, { scrollWheelZoom: false, zoomControl: true }).setView([-6.7, 107.9], 8); let bad = 0, ok = 0;
+    // Layar sentuh: satu jari menggulir halaman (dragging/tap mati => Leaflet memakai touch-action: pan-x pan-y), dua jari = zoom dan geser (touchZoom).
+    // Mouse: zoom scroll baru aktif setelah peta diklik/difokus agar gulir halaman tidak terjebak.
+    const touch = !!((L.Browser && L.Browser.mobile) || (window.matchMedia && matchMedia('(pointer: coarse)').matches));
+    const map = L.map(el, { scrollWheelZoom: false, zoomControl: true, dragging: !touch, tap: !touch, touchZoom: true, keyboard: true }).setView([-6.7, 107.9], 8); let bad = 0, ok = 0;
+    const hint = root.querySelector('#mhint'); let ht = 0; const seen = (k) => { try { return sessionStorage.getItem(k) === '1'; } catch { return false; } }; const mark = (k) => { try { sessionStorage.setItem(k, '1'); } catch { /* tanpa sessionStorage: petunjuk bisa muncul lagi */ } };
+    const say = (key, text) => { if (!hint || seen(key)) return; mark(key); hint.textContent = text; hint.classList.add('show'); clearTimeout(ht); ht = setTimeout(() => { hint.classList.remove('show'); }, 2600); };
+    if (touch) { el.addEventListener('touchstart', (e) => { if (e.touches && e.touches.length === 1) say('lp_mh_t', 'Gunakan dua jari untuk menggeser dan zoom peta'); }, { passive: true }); }
+    else {
+      let on = false; const set = (v) => { on = v; if (v) map.scrollWheelZoom.enable(); else map.scrollWheelZoom.disable(); if (v && hint) hint.classList.remove('show'); };
+      map.on('click', () => set(true)); el.addEventListener('focus', () => set(true)); el.addEventListener('blur', () => set(false)); el.addEventListener('mouseleave', () => { if (document.activeElement !== el) set(false); });
+      el.addEventListener('mouseenter', () => { if (!on) say('lp_mh_d', 'Klik peta lalu scroll untuk zoom'); });
+      el.addEventListener('wheel', () => { if (!on) say('lp_mh_d', 'Klik peta lalu scroll untuk zoom'); }, { passive: true });
+    }
+    // Ukuran mengikuti kontainer tanpa membuat ulang peta atau mereset posisi/zoom pengguna.
+    let raf = 0; const fit = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => { if (!el.isConnected) return; map.invalidateSize({ pan: false }); }); };
+    if (typeof ResizeObserver !== 'undefined') new ResizeObserver(fit).observe(el); window.addEventListener('resize', fit); window.addEventListener('orientationchange', fit);
     const tl = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, referrerPolicy: 'origin', attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>' }).addTo(map);
     tl.on('tileload', () => { ok++; }); tl.on('tileerror', () => { if (++bad >= 4 && !ok) open(); });
     const cl = L.markerClusterGroup({ maxClusterRadius: 38, spiderfyOnMaxZoom: true, showCoverageOnHover: false, iconCreateFunction: (c) => { const n = c.getChildCount(), f = c.getAllChildMarkers().some((m) => m.options.flagged); return L.divIcon({ html: `<div><span>${n}</span></div>`, className: `marker-cluster marker-cluster-${n < 10 ? 'small' : n < 50 ? 'medium' : 'large'}${f ? ' lp-flag' : ''}`, iconSize: [40, 40] }); } });
