@@ -69,7 +69,7 @@ const R = require('../server/regions'); const { start } = require('../server/ind
     assert.ok(m.includes('scrollWheelZoom: false') && m.includes('dragging: !touch') && m.includes('tap: !touch') && m.includes('touchZoom: true') && m.includes('keyboard: true'));
     assert.ok(m.includes("matchMedia('(pointer: coarse)')") && m.includes('L.Browser.mobile') && m.includes('scrollWheelZoom.enable()') && m.includes('mouseleave') && m.includes('invalidateSize({ pan: false })') && m.includes('ResizeObserver') && m.includes('orientationchange'));
     assert.ok(m.includes('Klik peta lalu scroll untuk zoom') && m.includes('Gunakan dua jari untuk menggeser dan zoom peta') && m.includes('id="mhint" class="map-hint" role="status" aria-live="polite"') && m.includes('sessionStorage'));
-    assert.ok(css.includes('.lmap{height:clamp(260px,55vh,480px)') && css.includes('prefers-reduced-motion:reduce){.map-hint') && !css.includes('.lmap{height:340px')); assert.match(sw, /lp-shell-v7/);
+    assert.ok(css.includes('.lmap{height:clamp(260px,55vh,480px)') && css.includes('prefers-reduced-motion:reduce){.map-hint') && !css.includes('.lmap{height:340px')); assert.match(sw, /lp-shell-v8/); assert.ok(m.includes("el.addEventListener('mouseleave', () => set(false))") && !m.includes('document.activeElement') && !m.includes('.blur()'));
   });
   await t('sprite ikon disajikan', async () => { const r = await fetch(base + '/assets/icons.svg'); assert.strictEqual(r.status, 200); assert.match(r.headers.get('content-type'), /svg/); });
   const col = s.D.col;
