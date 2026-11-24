@@ -26,7 +26,7 @@ S.prediksi = async (m) => {
     <div class="tw"><table><tr><th>Minggu mulai</th><th>Proyeksi</th><th>Rentang 80%</th></tr>${r.forecast.map((p) => `<tr><td>${esc(p.weekStart)}</td><td><b>${kg(p.yhat)}</b></td><td>${kg(p.lo)} – ${kg(p.hi)}</td></tr>`).join('')}</table></div>
     <h3>Evaluasi model</h3><p class="small">Model dipakai: <b>${esc(r.model)}</b>. ${esc(r.modelNote)}</p><div class="tw"><table><tr><th>Model</th><th>Galat uji (MAE, kg/minggu)</th><th>MAPE %</th></tr>${Object.entries(r.evaluation.test).map(([k, v]) => `<tr><td>${esc(k)}${k === r.model ? ' ✓' : ''}${k === 'naif' ? ' <span class="small">(baseline)</span>' : ''}</td><td>${v.mae.toLocaleString('id-ID')}</td><td>${v.mape == null ? '-' : v.mape}</td></tr>`).join('')}</table></div>
     <p class="small">${esc(r.evaluation.method)} Minggu uji: ${r.evaluation.testWeeks} dari ${r.evaluation.weeksTotal}. Interval: ${esc(r.interval)}</p><h3>Keterbatasan</h3><ul style="margin-left:18px">${r.limitations.map((x) => `<li class="small">${esc(x)}</li>`).join('')}</ul>`
-      : `<div class="empty">${esc(r.message)}</div><div class="btns" style="justify-content:center"><button class="btn sm" id="pv">Lihat pratinjau (bukan untuk keputusan)</button></div>`}</div>`;
+      : `<div class="empty in">${esc(r.message)}</div><div class="btns" style="justify-content:center"><button class="btn sm" id="pv">Lihat pratinjau (bukan untuk keputusan)</button></div>`}</div>`;
     $('#sc').onchange = (e) => save({ scope: e.target.value }); const pv = $('#pv'); if (pv) pv.onclick = () => save({ preview: true });
     if (f.preview && !r.usable) save({ preview: false });
   } else if (f.tab === 'monitor') {

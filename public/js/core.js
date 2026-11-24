@@ -63,6 +63,16 @@ const opts = (arr, v, l, ph) => (ph ? `<option value="">${esc(ph)}</option>` : '
 // ---------- navigasi per peran ----------
 // ---------- ikon (sprite lokal /assets/icons.svg) ----------
 const ic = (n, cls) => '<svg class="ic' + (cls ? ' ' + cls : '') + '" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#i-' + n + '"/></svg>';
+// Empty state: ikon + satu kalimat + tombol aksi opsional. Markup ".empty" lama (teks polos) otomatis dilengkapi ikon oleh decorateUi().
+const emptyState = (text, o = {}) => '<div class="empty' + (o.ok ? ' ok' : '') + '">' + ic(o.icon || (o.ok ? 'shield-check' : 'inbox'), 'eic') + esc(text) + (o.action || '') + '</div>';
+// Ikon tombol aksi utama dipilih dari teksnya (tombol .pri/.gold, serta Unduh/Cetak). Tombol yang sudah berikon dilewati.
+const BTN_IC = [[/^(unduh|cadangkan)/i, 'download'], [/^cetak/i, 'printer'], [/^(catat|tambah|buat|terbitkan)/i, 'plus'], [/^(simpan)/i, 'save'], [/^(konfirmasi|setujui|aktifkan|gabungkan|ambil keputusan|kirim untuk)/i, 'check'], [/^(jalankan|mulai)/i, 'play'], [/^tanya/i, 'sparkles'], [/^lihat/i, 'eye'], [/^(masuk|daftar|buka|terima|kirim|minta|ke halaman)/i, 'arrow-right']];
+function decorateUi(root) {
+  if (!root || !root.querySelectorAll) return;
+  root.querySelectorAll('.empty:not(.in)').forEach((el) => { if (!el.querySelector('.eic')) el.insertAdjacentHTML('afterbegin', ic(el.classList.contains('ok') ? 'shield-check' : 'inbox', 'eic')); });
+  root.querySelectorAll('.btn').forEach((b) => { if (b.querySelector('.ic')) return; const t = (b.textContent || '').trim(); if (!(b.classList.contains('pri') || b.classList.contains('gold') || /^(unduh|cetak)/i.test(t))) return; const m = BTN_IC.find(([r]) => r.test(t)); if (m) b.insertAdjacentHTML('afterbegin', ic(m[1])); });
+}
+if (typeof MutationObserver !== 'undefined' && typeof document !== 'undefined' && document.body) { let busy = false; new MutationObserver(() => { if (busy) return; busy = true; try { decorateUi(document.body); } finally { busy = false; } }).observe(document.body, { childList: true, subtree: true }); }
 const NAV_IC = { beranda: 'home', portal: 'home', 'setoran-baru': 'plus-circle', setoran: 'clipboard', batch: 'package', kirim: 'truck', kiriman: 'truck', label: 'qr', terima: 'inbox', kemasan: 'box', verifikasi: 'shield-check', pengguna: 'users', pelaku: 'badge', kelompok: 'sprout', sengketa: 'scale', integritas: 'link', konfigurasi: 'sliders', audit: 'file', dashboard: 'grid', tracelog: 'route', anomali: 'alert', tren: 'trend', server: 'server', prediksi: 'chart', integrasi: 'plug', kasus: 'folder-search', risiko: 'gauge', neraca: 'scale', laporan: 'download', email: 'mail', copilot: 'sparkles', profil: 'user', 'mode-tindak': 'zap', 'mode-lihat': 'eye', mode: 'zap' };
 // Pengelompokan menu per seksi. Peran pelaku rantai pasok hanya punya satu seksi (Operasional) dan Akun.
 const NAV_SEC = { verifikasi: 'Pengawasan', sengketa: 'Pengawasan', dashboard: 'Pengawasan', tracelog: 'Pengawasan', anomali: 'Pengawasan', tren: 'Pengawasan', integritas: 'Pengawasan', kasus: 'Pengawasan', risiko: 'Pengawasan', neraca: 'Pengawasan', laporan: 'Pengawasan', mode: 'Administrasi', pengguna: 'Administrasi', pelaku: 'Administrasi', kelompok: 'Administrasi', konfigurasi: 'Administrasi', audit: 'Administrasi', 'mode-tindak': 'Administrasi', server: 'Lanjutan', prediksi: 'Lanjutan', integrasi: 'Lanjutan', email: 'Lanjutan', copilot: 'Lanjutan', profil: 'Akun' };
@@ -146,7 +156,7 @@ async function route() {
   curRoute = id; document.querySelectorAll('.nav').forEach((a) => a.classList.toggle('on', a.dataset.r === (id === 'detail' ? 'batch' : id)));
   const label = (nav.find((n) => n[0] === id) || [0, id === 'detail' ? 'Detail Batch' : ''])[1]; $('#ttl').textContent = label;
   const main = $('#main'); main.innerHTML = '<div class="empty in">Memuat…</div>';
-  try { await (S[(me.role === 'superadmin' ? 'sa:' : '') + id] || S[id] || S.__no)(main, param); } catch (e) { main.innerHTML = `<div class="card"><div class="empty">${esc(e.message)}</div></div>`; }
+  try { await (S[(me.role === 'superadmin' ? 'sa:' : '') + id] || S[id] || S.__no)(main, param); } catch (e) { main.innerHTML = `<div class="card"><div class="empty in">${esc(e.message)}</div></div>`; }
 }
 const go = (h) => { location.hash = h; };
 const reload = () => route();
