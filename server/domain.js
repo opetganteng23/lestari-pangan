@@ -16,7 +16,8 @@ module.exports = function createDomain(store) {
   const col = Object.fromEntries(['users', 'actors', 'referralCodes', 'farmerGroups', 'qrLabels', 'deposits', 'batches', 'transfers', 'events', 'outbox', 'anomalies', 'notifications', 'auditLogs', 'appConfig', 'counters', 'analyticsReports', 'scans', 'cases', 'corrections', 'emails', 'exportsLog', 'aiLogs', 'apiKeys', 'idem', 'deviceReadings', 'forecastRuns', 'simulations', 'resets'].map((n) => [n, C(n)]));
 
   const DEFAULT_CFG = { _id: 'cfg', tolerancePct: 2, depositSlaHours: 24, samplingRate: 30, qrQuotaPerPeriod: 200, yieldAlertPct: 55, hangingHours: 48, scanAlertPerDay: 100, massBalanceTolerancePct: 3, forecastMinWeeks: 12, notifierMode: 'manual' };
-  async function cfg() { let c = await col.appConfig.findOne({ _id: 'cfg' }); if (!c) c = await col.appConfig.insert({ ...DEFAULT_CFG }); return c; }
+  // Dokumen konfigurasi lama (dibuat sebelum sebuah kunci ada) digabung dengan bawaan, supaya kunci baru tidak undefined.
+  async function cfg() { let c = await col.appConfig.findOne({ _id: 'cfg' }); if (!c) c = await col.appConfig.insert({ ...DEFAULT_CFG }); return { ...DEFAULT_CFG, ...c }; }
   async function seq(name) { let c = await col.counters.findOne({ _id: name }); if (!c) await col.counters.insert({ _id: name, n: 0 }); const n = (c ? c.n : 0) + 1; await col.counters.update({ _id: name }, { n }); return n; }
   const pad = (n, w = 6) => String(n).padStart(w, '0');
 

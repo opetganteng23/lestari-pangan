@@ -1,5 +1,5 @@
 // Service worker: cangkang aplikasi tersedia offline. Data /api, /uploads, dan halaman konsumen TIDAK disimpan (privasi & kesegaran data).
-const CACHE = 'lp-shell-v5';
+const CACHE = 'lp-shell-v6';
 const SHELL = ['/', '/app.html', '/css/landing.css', '/css/auth.css', '/js/landing.js', '/js/auth.js', '/css/app.css', '/js/core.js', '/js/screens-actor.js', '/js/screens-admin.js', '/js/map.js', '/assets/icons.svg', '/js/screens-ops.js', '/js/screens-server.js', '/js/screens-mfa.js', '/js/screens-common.js', '/js/screens-farmer.js', '/js/screens-predict.js', '/js/offline.js', '/assets/img/emblem.png', '/assets/fonts/Poppins-Regular.ttf', '/assets/fonts/Poppins-Medium.ttf', '/assets/fonts/Poppins-Bold.ttf', '/assets/fonts/Poppins-Light.ttf'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => Promise.all(SHELL.map((u) => c.add(u).catch(() => {})))).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => { e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())); });

@@ -13,7 +13,7 @@ const dummy = () => new Proxy(function () {}, { get: (t, k) => (k === Symbol.toP
     document: { querySelector: () => dummy(), querySelectorAll: () => [], createElement: () => dummy(), body: dummy(), addEventListener() {} }, Image: function () {}, FileReader: function () {} };
   ctx.window = ctx; ctx.addEventListener = () => {}; vm.createContext(ctx);
   const files = ['core', 'auth', 'screens-actor', 'map', 'screens-admin', 'screens-ops', 'screens-server', 'screens-farmer', 'screens-predict', 'offline', 'screens-mfa', 'screens-common'];
-  vm.runInContext(files.map((f) => fs.readFileSync(path.join(__dirname, '../public/js', f + '.js'), 'utf8')).join('\n;\n') + '\n;globalThis.__x = { S, NAV, navFor, NAV_IC, SEC_ORDER, secOf, ic, navHtml, api, ld, sd, ss, get me() { return me; }, set me(v) { me = v; } };', ctx, { filename: 'public/js/*.js' });
+  vm.runInContext(files.map((f) => fs.readFileSync(path.join(__dirname, '../public/js', f + '.js'), 'utf8')).join('\n;\n') + '\n;globalThis.__x = { S, NAV, navFor, BTN_IC, emptyState, NAV_IC, SEC_ORDER, secOf, ic, navHtml, api, ld, sd, ss, get me() { return me; }, set me(v) { me = v; } };', ctx, { filename: 'public/js/*.js' });
   const X = ctx.__x; const main = () => ({ innerHTML: '', querySelector: () => dummy(), querySelectorAll: () => [], insertAdjacentHTML() {} });
   const ACCTS = ['sa', 'admin', 'pengawas', 'pengepul1', 'gudang1', 'distributor', 'logistik', 'retailer', 'kelompok.sumber'];
   const caseId = async (tok) => { const r = await fetch(base + '/api/cases', { headers: { authorization: 'Bearer ' + tok } }); return (await r.json())[0]?._id; };
@@ -44,6 +44,15 @@ const dummy = () => new Proxy(function () {}, { get: (t, k) => (k === Symbol.toP
       if (X.navFor('pengepul').length !== X.NAV.pengepul.length) throw new Error('peran pelaku tidak boleh tersaring');
     } catch (e) { fails++; console.log('  GAGAL menu gabungan/FEATURES → ' + e.message); }
   })();
+  { // empty state dan ikon tombol memakai simbol yang ada di sprite
+    ran++; try {
+      const sprite = fs.readFileSync(path.join(__dirname, '../public/assets/icons.svg'), 'utf8');
+      for (const [, ico] of X.BTN_IC) if (!sprite.includes('id="i-' + ico + '"')) throw new Error('ikon tombol ' + ico + ' tidak ada di sprite');
+      const e = X.emptyState('Belum ada data', { action: '<a class="btn pri" href="#/x">Buat</a>' }); if (!e.includes('aria-hidden="true"') || !e.includes('#i-inbox') || !e.includes('Belum ada data') || !e.includes('btn pri')) throw new Error('emptyState tidak lengkap');
+      if (!X.emptyState('Aman', { ok: true }).includes('#i-shield-check')) throw new Error('varian ok');
+      if (/undefined|NaN/.test(e)) throw new Error('emptyState memuat undefined');
+    } catch (er) { fails++; console.log('  GAGAL empty state/ikon tombol → ' + er.message); }
+  }
   { // ikon dan seksi menu: setiap menu punya ikon yang ada di sprite dan masuk satu seksi dikenal
     const sprite = fs.readFileSync(path.join(__dirname, '../public/assets/icons.svg'), 'utf8'); ran++;
     try {

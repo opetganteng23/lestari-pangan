@@ -26,7 +26,7 @@ async function drawMap(root, pts) {
   try {
     const el = root.querySelector('#lmap'); if (!el) return; await loadLeaflet();
     const map = L.map(el, { scrollWheelZoom: false, zoomControl: true }).setView([-6.7, 107.9], 8); let bad = 0, ok = 0;
-    const tl = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>' }).addTo(map);
+    const tl = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, referrerPolicy: 'origin', attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>' }).addTo(map);
     tl.on('tileload', () => { ok++; }); tl.on('tileerror', () => { if (++bad >= 4 && !ok) open(); });
     const cl = L.markerClusterGroup({ maxClusterRadius: 38, spiderfyOnMaxZoom: true, showCoverageOnHover: false, iconCreateFunction: (c) => { const n = c.getChildCount(), f = c.getAllChildMarkers().some((m) => m.options.flagged); return L.divIcon({ html: `<div><span>${n}</span></div>`, className: `marker-cluster marker-cluster-${n < 10 ? 'small' : n < 50 ? 'medium' : 'large'}${f ? ' lp-flag' : ''}`, iconSize: [40, 40] }); } });
     const placed = pts.filter(hasLoc);

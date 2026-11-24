@@ -162,9 +162,9 @@ async function renderLineage(el, id) {
       <div class="small" style="margin-top:6px">${Object.entries(s).filter(([, n]) => n).map(([k, n]) => `${n} ${(INT_LABEL[k] || [0, k])[1].toLowerCase()}`).join(' · ')}</div>
       <p class="small" style="margin-top:6px">${esc(v.note)}</p></div>`;
     });
-  } catch (e) { el.innerHTML = `<div class="card" style="margin-top:16px"><div class="empty">${esc(e.message)}</div></div>`; }
+  } catch (e) { el.innerHTML = `<div class="card" style="margin-top:16px"><div class="empty in">${esc(e.message)}</div></div>`; }
 }
 
 const PAL = ['#237A41', '#F2B21B', '#2E9150', '#245FA3', '#9A6212', '#C62F2F'];
 function compBar(comp) { return `<div class="bar">${comp.map((c, i) => `<div title="${esc(c.name)}" style="width:${c.pct}%;background:${PAL[i % PAL.length]}"></div>`).join('')}</div><div class="small">${comp.map((c, i) => `<div><i style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${PAL[i % PAL.length]};margin-right:6px"></i><b>${c.pct}%</b> ${esc(c.name)} · ${esc(c.district)} <span class="chip ${c.rejected ? 'bad' : c.auto ? 'info' : 'ok'}">${c.rejected ? 'ditolak' : c.auto ? 'sebagian otomatis' : 'terverifikasi'}</span></div>`).join('')}</div>`; }
-S.__no = async (m) => { m.innerHTML = '<div class="card"><div class="empty">Halaman belum tersedia</div></div>'; };
+S.__no = async (m) => { m.innerHTML = '<div class="card"><div class="empty in">Halaman belum tersedia</div></div>'; };

@@ -21,7 +21,7 @@ t('sniffImage mengenali JPEG/PNG/WEBP dan menolak lainnya', () => {
 });
 t('kebijakan kata sandi', () => { assert.ok(sec.passwordIssue('pendek1')); assert.ok(sec.passwordIssue('hurufsajaaa')); assert.ok(sec.passwordIssue('12345678')); assert.strictEqual(sec.passwordIssue('abc12345'), null); });
 t('header keamanan memuat CSP dan HSTS hanya di balik https', () => {
-  assert.ok(sec.securityHeaders({ headers: {} })['content-security-policy']); assert.ok(!sec.securityHeaders({ headers: {} })['strict-transport-security']);
+  assert.strictEqual(sec.securityHeaders({ headers: {} })['referrer-policy'], 'strict-origin-when-cross-origin'); assert.ok(sec.securityHeaders({ headers: {} })['content-security-policy']); assert.ok(!sec.securityHeaders({ headers: {} })['strict-transport-security']);
   assert.ok(sec.securityHeaders({ headers: { 'x-forwarded-proto': 'https' } })['strict-transport-security']);
 });
 t('hash sandi dan token', () => {
