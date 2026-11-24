@@ -32,7 +32,8 @@ module.exports = function build(D, A) {
     loginLimiter.clear(key); await col.users.update({ _id: u._id }, { lastLogin: D.now() });
     await D.audit({ user: u }, 'login', u.email); return { token: auth.sign({ uid: u._id, sv: u.sv || 0 }, 12 * 3600), user: pubUser(u) };
   }, { public: true });
-  add('GET', '/api/health', async () => ({ ok: true, demoAccounts: process.env.SEED_DEMO !== '0', store: A.storeKind, uptimeSec: Math.round(process.uptime()), time: D.now() }), { public: true });
+  // demoAccounts = masih ada akun @lestari.id yang aktif (bukan sekadar nilai SEED_DEMO); demoMode = alat ubah-data-event hidup (hanya mati bila DEMO_MODE=0)
+  add('GET', '/api/health', async () => ({ ok: true, demoAccounts: (await col.users.find({})).some((u) => /@lestari\.id$/i.test(u.email) && u.active !== false), demoMode: process.env.DEMO_MODE !== '0', store: A.storeKind, uptimeSec: Math.round(process.uptime()), time: D.now() }), { public: true });
   add('POST', '/api/logout', async (c) => { await col.users.update({ _id: c.user._id }, { sv: (c.user.sv || 0) + 1 }); await D.audit(c, 'logout', c.user.email); return { ok: true }; });
   add('POST', '/api/me/password', async (c) => {
     const b = c.body; if (!auth.checkPassword(String(b.current || ''), c.user.passwordHash)) throw bad('Kata sandi saat ini salah');

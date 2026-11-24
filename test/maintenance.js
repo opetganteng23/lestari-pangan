@@ -47,5 +47,13 @@ const read = () => JSON.parse(fs.readFileSync(path.join(dir, 'db.json'), 'utf8')
     assert.ok(!d.farmerGroups.some((g) => ['KT QA', 'KT Tes'].includes(g.name))); assert.ok(!d.users.some((u) => u.email === 'tespengepul@lestari.id')); assert.ok(d.users.some((u) => u.email === 'teskode@lestari.id'), 'akun yang pelakunya dilewati ikut tetap');
     assert.ok(d.actors.length >= 8, 'pelaku demo utuh'); assert.ok(d.users.some((u) => u.email === 'owner@contoh.id'));
   });
+  await t('health jujur: demoAccounts=false setelah akun demo dinonaktifkan, dan login demo ditolak', async () => {
+    const s3 = await start({ port: 0 }); const base = 'http://localhost:' + s3.server.address().port;
+    try {
+      const h = await (await fetch(base + '/api/health')).json(); assert.strictEqual(h.demoAccounts, false); assert.strictEqual(typeof h.demoMode, 'boolean');
+      const r = await fetch(base + '/api/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: 'sa@lestari.id', password: 'lestari123' }) }); assert.strictEqual(r.status, 401);
+      const ok = await fetch(base + '/api/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: 'owner@contoh.id', password: 'Rahasia123' }) }); assert.strictEqual(ok.status, 200, 'akun non-demo tetap bisa masuk');
+    } finally { s3.server.close(); }
+  });
   console.log(fails ? `\n${fails} GAGAL` : '\nSemua lulus'); process.exit(fails ? 1 : 0);
 })();
