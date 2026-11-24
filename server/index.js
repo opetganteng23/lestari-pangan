@@ -59,7 +59,7 @@ async function start({ port = +process.env.PORT || 3000, dataDir = DATA, seed = 
       return send(res, 200, fs.readFileSync(f), { 'content-type': MIME[path.extname(f)] || 'application/octet-stream', 'cache-control': f.includes('fonts') || f.includes('img') ? 'public,max-age=86400' : 'no-cache' });
     } catch (e) {
       const code = e.status || (e instanceof SyntaxError ? 400 : 500); if (code === 500) console.error(e);
-      send(res, code, { error: code === 500 ? 'Terjadi kesalahan di server' : e.message });
+      send(res, code, { error: code === 500 ? 'Terjadi kesalahan di server' : e.message, ...(code !== 500 && e.extra ? e.extra : {}) });
     }
   });
   const HOST = process.env.HOST || undefined; await new Promise((r) => (HOST ? server.listen(port, HOST, r) : server.listen(port, r)));

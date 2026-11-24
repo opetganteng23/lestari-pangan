@@ -6,6 +6,7 @@ module.exports = function build(D, A) {
   const { col, bad, forbid, notFound, conflict } = D; const R = [];
   const add = (method, p, fn, o = {}) => R.push({ method, re: new RegExp('^' + p.replace(/:(\w+)/g, '(?<$1>[^/]+)') + '$'), fn, ...o });
   const ACTOR_ROLES = ['pengepul', 'gudang', 'distributor', 'logistik', 'retailer'];
+  const MFA = require('./mfa')(D);
   // izin: superadmin asli (tanpa act/view) memiliki fitur admin + pengawas
   function need(ctx, roles, write) {
     if (write && ctx.readOnly) throw forbid('Mode Lihat: hanya baca. Masuk Mode Tindak untuk bertindak.');
@@ -29,6 +30,11 @@ module.exports = function build(D, A) {
     if (loginLimiter.blocked(key)) throw new D.HttpError(429, `Terlalu banyak percobaan gagal. Coba lagi dalam ${Math.ceil(loginLimiter.retryAfter(key) / 60)} menit.`);
     const u = await col.users.findOne({ email });
     if (!u || !u.active || !auth.checkPassword(String(c.body.password || ''), u.passwordHash)) { loginLimiter.hit(key); throw new D.HttpError(401, 'Email atau kata sandi salah'); }
+    // super admin dengan MFA aktif: setelah sandi benar, wajib kode TOTP/pemulihan; kode salah dihitung sebagai percobaan gagal
+    if (u.role === 'superadmin' && MFA.enabled(u)) {
+      const otp = String(c.body.otp || '').trim(); if (!otp) throw new D.HttpError(401, 'Masukkan kode verifikasi 6 digit dari aplikasi autentikator', { mfaRequired: true });
+      if (!(await MFA.check(u, otp))) { loginLimiter.hit(key); throw new D.HttpError(401, 'Kode verifikasi salah atau sudah dipakai', { mfaRequired: true }); }
+    }
     loginLimiter.clear(key); await col.users.update({ _id: u._id }, { lastLogin: D.now() });
     await D.audit({ user: u }, 'login', u.email); return { token: auth.sign({ uid: u._id, sv: u.sv || 0 }, 12 * 3600), user: pubUser(u) };
   }, { public: true });
@@ -56,7 +62,7 @@ module.exports = function build(D, A) {
   const pubUser = (u) => ({ _id: u._id, name: u.name, email: u.email, role: u.role, actorId: u.actorId, groupId: u.groupId || null });
 
   // ----- sesi -----
-  add('GET', '/api/me', async (c) => ({ user: pubUser(c.user), role: c.role, actor: c.actor, group: c.group ? { _id: c.group._id, name: c.group.name, district: c.group.district } : null, service: D.serverctl.gateState(await D.serverctl.getGate()), act: c.act ? { role: c.act.role, actorId: c.act.actorId, reason: c.act.reason, exp: c.act.exp } : null, readOnly: !!c.readOnly, config: await D.cfg(), store: A.storeKind, network: require('./ledger').network, ai: process.env.ANTHROPIC_API_KEY ? 'claude' : 'rules' }));
+  add('GET', '/api/me', async (c) => ({ user: pubUser(c.user), role: c.role, actor: c.actor, group: c.group ? { _id: c.group._id, name: c.group.name, district: c.group.district } : null, service: D.serverctl.gateState(await D.serverctl.getGate()), act: c.act ? { role: c.act.role, actorId: c.act.actorId, reason: c.act.reason, exp: c.act.exp } : null, readOnly: !!c.readOnly, mfa: c.user.role === 'superadmin' ? { enabled: MFA.enabled(c.user), recoveryLeft: MFA.recoveryLeft(c.user) } : null, config: await D.cfg(), store: A.storeKind, network: require('./ledger').network, ai: process.env.ANTHROPIC_API_KEY ? 'claude' : 'rules' }));
   add('GET', '/api/actors', async (c) => { const f = c.query.role ? { role: c.query.role } : {}; return (await col.actors.find(f)).map((a) => ({ _id: a._id, name: a.name, role: a.role, district: a.district, lat: a.lat, lng: a.lng })); });
 
   // ----- super admin -----
@@ -67,6 +73,8 @@ module.exports = function build(D, A) {
     const a = await col.actors.findOne({ _id: b.actorId }); if (!a) throw notFound('Pelaku sasaran tidak ditemukan');
     if (!b.reason || String(b.reason).trim().length < 10) throw bad('Alasan wajib diisi (min. 10 karakter)');
     if (!auth.checkPassword(String(b.password || ''), c.user.passwordHash)) throw forbid('Konfirmasi kata sandi salah');
+    if (!MFA.enabled(c.user)) throw forbid('Mode Tindak butuh MFA. Aktifkan di menu Profil → Verifikasi dua langkah.');
+    await MFA.guard(c.user, b.otp);
     const ttl = 15 * 60; const token = auth.sign({ uid: c.user._id, act: { role: a.role, actorId: a._id, reason: String(b.reason).trim() } }, ttl);
     await D.audit(c, 'mode_tindak.mulai', `${a.name} (${a.role}) — ${b.reason}`); await D.notify({ toActorId: a._id, text: `Administrator (${c.user.name}) bertindak atas nama Anda: ${b.reason}` });
     return { token, expiresInSec: ttl, actor: a };
@@ -208,6 +216,6 @@ module.exports = function build(D, A) {
 
   // ----- QR -----
   add('GET', '/api/qr', async (c) => ({ svg: qr.svg(c.query.text || '') }), { public: true });
-  const rc = { D, add, need, ACTOR_ROLES, bad, notFound, forbid, conflict, sec, auth, names, pubUser }; require('./routes-ops')(rc); require('./routes-partner')(rc); require('./routes-server')(rc); require('./routes-auth')(rc);
+  const rc = { D, add, need, ACTOR_ROLES, bad, notFound, forbid, conflict, sec, auth, names, pubUser, MFA }; require('./routes-mfa')(rc); require('./routes-ops')(rc); require('./routes-partner')(rc); require('./routes-server')(rc); require('./routes-auth')(rc);
   return R;
 };

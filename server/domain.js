@@ -4,7 +4,7 @@ const ledger = require('./ledger/index');
 const { sha256, hashPassword, checkPassword } = require('./auth');
 const { uid } = require('./store');
 
-class HttpError extends Error { constructor(status, msg) { super(msg); this.status = status; } }
+class HttpError extends Error { constructor(status, msg, extra) { super(msg); this.status = status; if (extra) this.extra = extra; } }
 const bad = (m) => new HttpError(400, m), forbid = (m) => new HttpError(403, m), notFound = (m) => new HttpError(404, m), conflict = (m) => new HttpError(409, m);
 const now = () => new Date().toISOString();
 const stable = (o) => JSON.stringify(o, (k, v) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.keys(v).sort().map((x) => [x, v[x]])) : v));
