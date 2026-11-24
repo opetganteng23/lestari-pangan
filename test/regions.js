@@ -64,6 +64,13 @@ const R = require('../server/regions'); const { start } = require('../server/ind
     finally { if (o === undefined) delete process.env.FEATURES; else process.env.FEATURES = o; }
   });
   await t('endpoint tak terpakai /api/qr sudah dihapus; passport publik tetap ada', async () => { assert.strictEqual((await call('/api/qr?text=x')).status, 404); assert.strictEqual((await call('/api/products/LP-PKG-2026-0211/passport')).status, 200); });
+  await t('peta: opsi interaksi, petunjuk beraria-live, tinggi responsif, ResizeObserver, cache SW (uji sumber; interaksi nyata tidak bisa diuji otomatis)', () => {
+    const rd = (f) => fs.readFileSync(path.join(__dirname, '..', f), 'utf8'); const m = rd('public/js/map.js'), css = rd('public/css/app.css'), sw = rd('public/sw.js');
+    assert.ok(m.includes('scrollWheelZoom: false') && m.includes('dragging: !touch') && m.includes('tap: !touch') && m.includes('touchZoom: true') && m.includes('keyboard: true'));
+    assert.ok(m.includes("matchMedia('(pointer: coarse)')") && m.includes('L.Browser.mobile') && m.includes('scrollWheelZoom.enable()') && m.includes('mouseleave') && m.includes('invalidateSize({ pan: false })') && m.includes('ResizeObserver') && m.includes('orientationchange'));
+    assert.ok(m.includes('Klik peta lalu scroll untuk zoom') && m.includes('Gunakan dua jari untuk menggeser dan zoom peta') && m.includes('id="mhint" class="map-hint" role="status" aria-live="polite"') && m.includes('sessionStorage'));
+    assert.ok(css.includes('.lmap{height:clamp(260px,55vh,480px)') && css.includes('prefers-reduced-motion:reduce){.map-hint') && !css.includes('.lmap{height:340px')); assert.match(sw, /lp-shell-v7/);
+  });
   await t('sprite ikon disajikan', async () => { const r = await fetch(base + '/assets/icons.svg'); assert.strictEqual(r.status, 200); assert.match(r.headers.get('content-type'), /svg/); });
   const col = s.D.col;
   const mk = (name, district, lat, lng) => col.actors.insert({ name, role: 'pengepul', district, lat, lng });
