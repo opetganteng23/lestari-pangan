@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const ledger = require('./ledger/index');
 const { sha256, hashPassword, checkPassword } = require('./auth');
 const { uid } = require('./store');
+const REG = require('./regions');
 
 class HttpError extends Error { constructor(status, msg, extra) { super(msg); this.status = status; if (extra) this.extra = extra; } }
 const bad = (m) => new HttpError(400, m), forbid = (m) => new HttpError(403, m), notFound = (m) => new HttpError(404, m), conflict = (m) => new HttpError(409, m);
@@ -80,10 +81,10 @@ module.exports = function createDomain(store) {
   const codeOk = (g, code) => g.codeHash === sha256(g.codeSalt + String(code || '').trim().toUpperCase());
   function newGroupCode(prefix) { return `${prefix.toUpperCase().slice(0, 3)}-${crypto.randomInt(1000, 9999)}`; }
   async function createGroup(ctx, d) {
-    if (!d.name || !d.district) throw bad('Nama dan kecamatan wajib');
+    if (!d.name) throw bad('Nama kelompok wajib'); if (!String(d.district || '').trim()) throw bad('Wilayah wajib dipilih'); const pl = REG.locate(d.district, { keepKecamatan: true, kecamatan: d.kecamatan }); if (!pl) throw bad('Wilayah tidak dikenal: pilih kabupaten/kota dari daftar');
     const code = newGroupCode((d.name.replace(/^KT\s+/i, '').replace(/[^A-Za-z]/g, '') + 'XXX'));
     const salt = crypto.randomBytes(6).toString('hex');
-    const g = await col.farmerGroups.insert({ name: d.name, ketua: d.ketua || '', district: d.district, village: d.village || '', lat: +d.lat || -6.55, lng: +d.lng || 107.7, hectares: +d.hectares || 0, avgWeightKg: +d.avgWeightKg || 1500, linkedActorIds: d.linkedActorIds || [], codeSalt: salt, codeHash: sha256(salt + code), active: true, createdAt: now() });
+    const g = await col.farmerGroups.insert({ name: d.name, ketua: d.ketua || '', district: pl.district, village: d.village || '', lat: pl.lat, lng: pl.lng, hectares: +d.hectares || 0, avgWeightKg: +d.avgWeightKg || 1500, linkedActorIds: d.linkedActorIds || [], codeSalt: salt, codeHash: sha256(salt + code), active: true, createdAt: now() });
     await audit(ctx, 'kelompok_tani.buat', g.name);
     return { group: publicGroup(g), code };
   }

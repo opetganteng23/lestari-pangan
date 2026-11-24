@@ -6,7 +6,7 @@ module.exports = function build(D, A) {
   const { col, bad, forbid, notFound, conflict } = D; const R = [];
   const add = (method, p, fn, o = {}) => R.push({ method, re: new RegExp('^' + p.replace(/:(\w+)/g, '(?<$1>[^/]+)') + '$'), fn, ...o });
   const ACTOR_ROLES = ['pengepul', 'gudang', 'distributor', 'logistik', 'retailer'];
-  const MFA = require('./mfa')(D);
+  const MFA = require('./mfa')(D); const REG = require('./regions');
   // izin: superadmin asli (tanpa act/view) memiliki fitur admin + pengawas
   function need(ctx, roles, write) {
     if (write && ctx.readOnly) throw forbid('Mode Lihat: hanya baca. Masuk Mode Tindak untuk bertindak.');
@@ -47,12 +47,16 @@ module.exports = function build(D, A) {
     const sv = (c.user.sv || 0) + 1; await col.users.update({ _id: c.user._id }, { passwordHash: auth.hashPassword(String(b.next)), sv });
     await D.audit(c, 'sandi.ganti', c.user.email); return { token: auth.sign({ uid: c.user._id, sv }, 12 * 3600) };
   });
+  // Wilayah wajib dipilih dari daftar resmi; koordinat selalu diturunkan dari wilayah, bukan dari masukan klien.
+  const placeOf = (raw) => { if (!String(raw || '').trim()) throw bad('Wilayah wajib dipilih'); const p = REG.locate(raw); if (!p) throw bad('Wilayah tidak dikenal: pilih kabupaten/kota dari daftar'); return p; };
+  add('GET', '/api/regions', async () => REG.list(), { public: true });
   add('POST', '/api/register', async (c) => {
     const b = c.body; const code = await col.referralCodes.findOne({ code: String(b.code || '').trim().toUpperCase() });
     if (!code || !code.active || (code.expiresAt && code.expiresAt < D.now()) || code.uses >= code.maxUses) throw bad('Kode referral tidak valid, kedaluwarsa, atau sudah habis dipakai');
     if (!b.email || !b.name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(b.email))) throw bad('Nama dan email yang valid wajib'); { const issue = sec.passwordIssue(b.password); if (issue) throw bad(issue); }
     if (await col.users.findOne({ email: b.email.toLowerCase() })) throw conflict('Email sudah terdaftar');
-    const actor = await col.actors.insert({ name: b.name, role: code.role, district: b.district || '', lat: +b.lat || -6.6, lng: +b.lng || 107.6, createdAt: D.now() });
+    const pl = placeOf(b.district);
+    const actor = await col.actors.insert({ name: b.name, role: code.role, district: pl.district, lat: pl.lat, lng: pl.lng, createdAt: D.now() });
     const u = await col.users.insert({ email: b.email.toLowerCase(), passwordHash: auth.hashPassword(b.password), name: b.name, role: code.role, actorId: actor._id, active: true });
     await col.referralCodes.update({ _id: code._id }, { uses: code.uses + 1 });
     await D.audit({ user: u }, 'registrasi', `${u.email} (${code.code})`);
@@ -83,7 +87,7 @@ module.exports = function build(D, A) {
   // ----- master: kelompok tani & referral -----
   add('GET', '/api/groups', async (c) => { let g = await col.farmerGroups.find({}); if (ACTOR_ROLES.includes(c.role)) g = g.filter((x) => x.active && (x.linkedActorIds || []).includes(c.actor?._id)); return g.map(D.publicGroup); });
   add('POST', '/api/groups', async (c) => { need(c, ['admin'], true); return D.createGroup(c, c.body); });
-  add('PUT', '/api/groups/:id', async (c) => { need(c, ['admin'], true); const b = c.body, p = {}; for (const k of ['name', 'ketua', 'district', 'village', 'hectares', 'avgWeightKg', 'lat', 'lng']) if (k in b) p[k] = ['hectares', 'avgWeightKg', 'lat', 'lng'].includes(k) ? +b[k] : b[k]; if ('active' in b) p.active = !!b.active; if (Array.isArray(b.linkedActorIds)) p.linkedActorIds = b.linkedActorIds; await col.farmerGroups.update({ _id: c.params.id }, p); await D.audit(c, 'kelompok_tani.ubah', c.params.id); return { ok: true }; });
+  add('PUT', '/api/groups/:id', async (c) => { need(c, ['admin'], true); const b = c.body, p = {}; for (const k of ['name', 'ketua', 'village', 'hectares', 'avgWeightKg']) if (k in b) p[k] = ['hectares', 'avgWeightKg'].includes(k) ? +b[k] : b[k]; if ('district' in b) { const pl = REG.locate(placeOf(b.district) && b.district, { keepKecamatan: true, kecamatan: b.kecamatan }); p.district = pl.district; p.lat = pl.lat; p.lng = pl.lng; } if ('active' in b) p.active = !!b.active; if (Array.isArray(b.linkedActorIds)) p.linkedActorIds = b.linkedActorIds; await col.farmerGroups.update({ _id: c.params.id }, p); await D.audit(c, 'kelompok_tani.ubah', c.params.id); return { ok: true }; });
   add('POST', '/api/groups/:id/rotate', async (c) => { need(c, ['admin'], true); return D.rotateGroupCode(c, c.params.id); });
   add('GET', '/api/referrals', async (c) => { need(c, ['admin']); return col.referralCodes.find({}, { sort: { createdAt: -1 } }); });
   add('POST', '/api/referrals', async (c) => { need(c, ['admin'], true); const b = c.body; if (![...ACTOR_ROLES].includes(b.role)) throw bad('Peran tidak valid'); const code = (b.code || `${b.role.slice(0, 3)}-${crypto.randomInt(10000, 99999)}`).toUpperCase(); if (await col.referralCodes.findOne({ code })) throw conflict('Kode sudah ada'); const r = await col.referralCodes.insert({ code, role: b.role, note: b.note || '', maxUses: +b.maxUses || 1, uses: 0, expiresAt: b.expiresAt || null, active: true, createdAt: D.now() }); await D.audit(c, 'referral.buat', code); return r; });
@@ -177,7 +181,7 @@ module.exports = function build(D, A) {
     if (await col.users.findOne({ email })) throw conflict('Email sudah terdaftar');
     let groupId = null; if (b.role === 'kelompok_tani') { const g = await col.farmerGroups.findOne({ _id: b.groupId }); if (!g) throw bad('Pilih kelompok tani untuk peran ini'); groupId = g._id; }
     let actor = null;
-    if (ACTOR_ROLES.includes(b.role)) actor = await col.actors.insert({ name: b.name, role: b.role, district: b.district || '', lat: +b.lat || -6.6, lng: +b.lng || 107.6, createdAt: D.now() });
+    if (ACTOR_ROLES.includes(b.role)) { const pl = placeOf(b.district); actor = await col.actors.insert({ name: b.name, role: b.role, district: pl.district, lat: pl.lat, lng: pl.lng, createdAt: D.now() }); }
     const u = await col.users.insert({ email, passwordHash: auth.hashPassword(String(b.password)), name: b.name, role: b.role, actorId: actor?._id || null, groupId, active: true });
     await D.audit(c, 'pengguna.buat', `${email} (${b.role})`); return pubU(u, actor);
   });
@@ -194,7 +198,7 @@ module.exports = function build(D, A) {
       if (ACTOR_ROLES.includes(b.role)) throw bad('Peran internal tidak bisa diubah menjadi pelaku rantai pasok; buat akun baru');
       p.role = b.role;
     }
-    if (u.actorId && ('name' in p || 'district' in b)) { const ap = {}; if (p.name) ap.name = p.name; if ('district' in b) ap.district = String(b.district || ''); await col.actors.update({ _id: u.actorId }, ap); }
+    if (u.actorId && ('name' in p || 'district' in b)) { const ap = {}; if (p.name) ap.name = p.name; if ('district' in b) { const pl = placeOf(b.district); ap.district = pl.district; ap.lat = pl.lat; ap.lng = pl.lng; } await col.actors.update({ _id: u.actorId }, ap); }
     await col.users.update({ _id: u._id }, p);
     await D.audit(c, 'pengguna.ubah', `${u.email}: ${Object.keys(p).map((k) => (k === 'passwordHash' ? 'password' : k)).join(', ') || 'wilayah'}`);
     return { ok: true };
