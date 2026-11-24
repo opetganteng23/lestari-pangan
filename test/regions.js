@@ -53,6 +53,12 @@ const R = require('../server/regions'); const { start } = require('../server/ind
     const csp = (await fetch(base + '/app')).headers.get('content-security-policy'); assert.ok(csp.includes("img-src 'self' data: blob: https://tile.openstreetmap.org;")); assert.ok(!csp.includes('*')); assert.match(csp, /script-src 'self' 'unsafe-inline';/); assert.match(csp, /connect-src 'self';/);
     const vj = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'vercel.json'), 'utf8')); const vc = JSON.stringify(vj); assert.ok(vc.includes('https://tile.openstreetmap.org'));
   });
+  await t('/api/me: simulation menyala selama SEED_DEMO atau DEMO_MODE aktif, mati bila keduanya 0', async () => {
+    const sim = async () => (await call('/api/me', { token: admin })).j.simulation; const o = [process.env.SEED_DEMO, process.env.DEMO_MODE];
+    try { delete process.env.SEED_DEMO; delete process.env.DEMO_MODE; assert.strictEqual(await sim(), true); process.env.SEED_DEMO = '0'; assert.strictEqual(await sim(), true); process.env.DEMO_MODE = '0'; assert.strictEqual(await sim(), false); delete process.env.SEED_DEMO; assert.strictEqual(await sim(), true); }
+    finally { for (const [k, v] of [['SEED_DEMO', o[0]], ['DEMO_MODE', o[1]]]) { if (v === undefined) delete process.env[k]; else process.env[k] = v; } }
+  });
+  await t('sprite ikon disajikan', async () => { const r = await fetch(base + '/assets/icons.svg'); assert.strictEqual(r.status, 200); assert.match(r.headers.get('content-type'), /svg/); });
   const col = s.D.col;
   const mk = (name, district, lat, lng) => col.actors.insert({ name, role: 'pengepul', district, lat, lng });
   const a1 = await mk('Mig Default Dikenal', 'Subang', -6.6, 107.6), a2 = await mk('Mig Default Asing', 'Atlantis', -6.6, 107.6), a3 = await mk('Mig Titik Sendiri', 'Subang', -6.1, 107.1);

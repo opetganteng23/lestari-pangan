@@ -15,7 +15,7 @@ S.prediksi = async (m) => {
   const f = ss.get('lp_pf') || { tab: 'proyeksi', scope: 'total' }; const save = (p) => { ss.set('lp_pf', { ...f, ...p }); reload(); };
   const tabs = [['proyeksi', 'Proyeksi'], ['monitor', 'Pemantauan model'], ['twin', 'Digital Twin']];
   const head = `<div class="tabs">${tabs.map(([k, l]) => `<button data-tab="${k}" class="${f.tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>`;
-  m.innerHTML = head + '<div id="pt"><div class="empty">Memuat…</div></div>'; m.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => save({ tab: b.dataset.tab })));
+  m.innerHTML = head + '<div id="pt"><div class="empty in">Memuat…</div></div>'; m.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => save({ tab: b.dataset.tab })));
   const el = $('#pt');
   if (f.tab === 'proyeksi') {
     const ds = await api('/api/predict/districts'); const q = '?scope=' + encodeURIComponent(f.scope) + (f.preview ? '&preview=1' : ''); const r = await api('/api/predict/forecast' + q); const rd = r.readiness || (await api('/api/predict/readiness?scope=' + encodeURIComponent(f.scope)));

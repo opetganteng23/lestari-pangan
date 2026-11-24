@@ -13,7 +13,7 @@ const dummy = () => new Proxy(function () {}, { get: (t, k) => (k === Symbol.toP
     document: { querySelector: () => dummy(), querySelectorAll: () => [], createElement: () => dummy(), body: dummy(), addEventListener() {} }, Image: function () {}, FileReader: function () {} };
   ctx.window = ctx; ctx.addEventListener = () => {}; vm.createContext(ctx);
   const files = ['core', 'auth', 'screens-actor', 'map', 'screens-admin', 'screens-ops', 'screens-server', 'screens-farmer', 'screens-predict', 'offline', 'screens-mfa', 'screens-common'];
-  vm.runInContext(files.map((f) => fs.readFileSync(path.join(__dirname, '../public/js', f + '.js'), 'utf8')).join('\n;\n') + '\n;globalThis.__x = { S, NAV, api, ld, sd, ss, get me() { return me; }, set me(v) { me = v; } };', ctx, { filename: 'public/js/*.js' });
+  vm.runInContext(files.map((f) => fs.readFileSync(path.join(__dirname, '../public/js', f + '.js'), 'utf8')).join('\n;\n') + '\n;globalThis.__x = { S, NAV, NAV_IC, SEC_ORDER, secOf, ic, navHtml, api, ld, sd, ss, get me() { return me; }, set me(v) { me = v; } };', ctx, { filename: 'public/js/*.js' });
   const X = ctx.__x; const main = () => ({ innerHTML: '', querySelector: () => dummy(), querySelectorAll: () => [], insertAdjacentHTML() {} });
   const ACCTS = ['sa', 'admin', 'pengawas', 'pengepul1', 'gudang1', 'distributor', 'logistik', 'retailer', 'kelompok.sumber'];
   const caseId = async (tok) => { const r = await fetch(base + '/api/cases', { headers: { authorization: 'Bearer ' + tok } }); return (await r.json())[0]?._id; };
@@ -30,6 +30,14 @@ const dummy = () => new Proxy(function () {}, { get: (t, k) => (k === Symbol.toP
     }
     if (a === 'admin') for (const tab of ['monitor', 'twin']) { ran++; ctx.sessionStorage.setItem('lp_pf', JSON.stringify({ tab, scope: 'total' })); try { const m = main(); await X.S.prediksi(m); await new Promise((r) => setTimeout(r, 50)); if (!m.innerHTML) throw new Error('kosong'); } catch (e) { fails++; console.log('  GAGAL admin prediksi/' + tab + ' → ' + e.message); } }
     console.log(`  ok   ${a} (${role}): ${routes.length} layar`);
+  }
+  { // ikon dan seksi menu: setiap menu punya ikon yang ada di sprite dan masuk satu seksi dikenal
+    const sprite = fs.readFileSync(path.join(__dirname, '../public/assets/icons.svg'), 'utf8'); ran++;
+    try {
+      for (const [role, items] of Object.entries(X.NAV)) for (const n of items) { const ico = X.NAV_IC[n[0]]; if (!ico) throw new Error(role + '/' + n[0] + ': tanpa ikon'); if (!sprite.includes('id="i-' + ico + '"')) throw new Error(n[0] + ': ikon ' + ico + ' tidak ada di sprite'); if (!X.SEC_ORDER.includes(X.secOf(n[0], role))) throw new Error(n[0] + ': seksi tak dikenal'); }
+      const h = X.navHtml(X.NAV.admin, 'admin', { pending: 3 }); if (!h.includes('<div class="nsec">Pengawasan</div>') || !h.includes('badge">3<')) throw new Error('navHtml tidak memuat seksi/badge'); if (h.includes('<i></i>')) throw new Error('masih ada kotak abu-abu');
+      const pe = X.navHtml(X.NAV.pengepul, 'pengepul', {}); if (/nsec">(Pengawasan|Administrasi|Lanjutan)/.test(pe)) throw new Error('peran pelaku tidak boleh punya seksi pengawasan');
+    } catch (e) { fails++; console.log('  GAGAL ikon/seksi menu → ' + e.message); }
   }
   await s.close(); console.log(fails ? `\n${fails} dari ${ran} layar gagal` : `\nSemua ${ran} layar terender tanpa galat`); process.exit(fails ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(1); });
