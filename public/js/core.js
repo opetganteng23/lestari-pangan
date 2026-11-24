@@ -16,7 +16,7 @@ async function api(path, { method = 'GET', body, raw, headers, noLogout } = {}) 
   const r = await fetch(path, { method, headers: h, body: body ? JSON.stringify(body) : undefined });
   const j = await r.json().catch(() => ({}));
   if (r.status === 401 && tok && !raw && !noLogout) { logout(true, 'sesi'); throw new Error(j.error || 'Sesi berakhir'); }
-  if (!r.ok) throw new Error(j.error || 'Terjadi kesalahan');
+  if (!r.ok) { const er = new Error(j.error || 'Terjadi kesalahan'); if (j.mfaRequired) er.mfaRequired = true; throw er; }
   return j;
 }
 function toast(msg, err) { const t = document.createElement('div'); t.className = 'toast' + (err ? ' err' : ''); t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), err ? 5200 : 3200); }

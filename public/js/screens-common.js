@@ -13,6 +13,7 @@ S.profil = async (m) => {
     <label class="f">Ulangi kata sandi baru</label><input class="inp" type="password" name="again" required minlength="8" autocomplete="new-password">
     <p class="small" style="margin-top:8px">Minimal 8 karakter, memuat huruf dan angka. Sesi di perangkat lain akan berakhir.</p>
     <div class="btns" style="margin-top:14px"><button class="btn pri">Simpan kata sandi</button></div></form></div></div>`;
+  if (u.role === 'superadmin' && !me.act && !me.readOnly) mfaCard($('.grid', m));
   $('#pw').onsubmit = guard(async (e) => {
     e.preventDefault();
     if (!(await askConfirm('Sesi di perangkat lain akan berakhir dan Anda harus masuk lagi di sana.', { title: 'Ganti kata sandi?', confirm: 'Ya, ganti', danger: false }))) return;
